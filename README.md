@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TicketHub - Open Source Ticketing System
+
+A modern, self-hosted ticketing system built with Next.js, PostgreSQL, and Prisma.
+
+## Features
+
+- 🎫 Multi-level ticket management (L1/L2/L3 support)
+- 👥 User roles (Admin & Agent)
+- 📁 Category-based ticket organization
+- 📎 File attachments (S3-compatible storage)
+- 🔐 Secure authentication with NextAuth.js
+- 🌙 Dark/Light mode support
+- 📱 Responsive design
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: NextAuth.js (Credentials Provider)
+- **Styling**: Tailwind CSS + Radix UI
+- **File Storage**: S3-compatible (Cloudflare R2, AWS S3, MinIO)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
+- Node.js 18+
+- PostgreSQL database
+- S3-compatible storage (optional, for attachments)
+
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/your-repo/ticket-oss.git
+cd ticket-oss
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Set up environment variables:
+```bash
+cp .env.example .env
+cp .env.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Edit `.env` and `.env.local` with your configuration:
+```env
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/tickethub"
 
-## Learn More
+# NextAuth.js
+NEXTAUTH_SECRET="your-secret-key-min-32-chars-here"
+NEXTAUTH_URL="http://localhost:3000"
 
-To learn more about Next.js, take a look at the following resources:
+# S3 Storage (optional)
+S3_ENDPOINT=
+S3_REGION=
+S3_BUCKET=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_PUBLIC_URL=
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. Set up the database:
+```bash
+npx prisma db push
+npm run db:seed
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. Run the development server:
+```bash
+npm run dev
+```
 
-## Deploy on Vercel
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Default Login Credentials
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+After seeding, you can login with:
+
+| Role  | Email                | Username | Password  |
+|-------|----------------------|----------|-----------|
+| Admin | admin@tickethub.com  | admin    | admin123  |
+| Agent | agent1@tickethub.com | agent1   | agent123  |
+| Agent | agent2@tickethub.com | agent2   | agent123  |
+| Agent | agent3@tickethub.com | agent3   | agent123  |
+
+**⚠️ Change these passwords in production!**
+
+## Project Structure
+
+```
+├── app/                  # Next.js App Router
+│   ├── (public)/         # Public pages
+│   ├── admin/            # Admin dashboard
+│   └── api/              # API routes
+├── components/           # React components
+├── lib/                  # Utilities and configurations
+├── prisma/               # Database schema and seed
+└── public/               # Static assets
+```
+
+## License
+
+MIT

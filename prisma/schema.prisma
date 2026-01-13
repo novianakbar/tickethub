@@ -1,0 +1,264 @@
+// Prisma schema for ticketing system
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  admin
+  agent
+}
+
+enum TicketStatus {
+  open
+  in_progress
+  pending
+  resolved
+  closed
+}
+
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum TicketSource {
+  phone
+  email
+  walk_in
+  web
+}
+
+// ============================================
+// SUPPORT LEVEL (Master Table)
+// ============================================
+
+model SupportLevel {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique // "L1", "L2", "L3"
+  name        String // "Support", "Specialist", "Expert"
+  description String?
+  sortOrder   Int     @default(0) @map("sort_order")
+  isActive    Boolean @default(true) @map("is_active")
+
+  // Ticket View Permissions
+  canViewOwnTickets  Boolean @default(true) @map("can_view_own_tickets")
+  canViewTeamTickets Boolean @default(false) @map("can_view_team_tickets")
+  canViewAllTickets  Boolean @default(false) @map("can_view_all_tickets")
+
+  // Ticket Action Permissions
+  canCreateTicket   Boolean @default(true) @map("can_create_ticket")
+  canAssignTicket   Boolean @default(false) @map("can_assign_ticket")
+  canEscalateTicket Boolean @default(false) @map("can_escalate_ticket")
+  canResolveTicket  Boolean @default(true) @map("can_resolve_ticket")
+  canCloseTicket    Boolean @default(false) @map("can_close_ticket")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  profiles Profile[]
+  tickets  Ticket[]
+
+  @@map("support_levels")
+}
+
+// ============================================
+// USER & AUTH
+// ============================================
+
+// Profile table - stores user credentials and profile info
+model Profile {
+  id        String       @id @default(uuid()) @db.Uuid
+  email     String       @unique
+  username  String?      @unique
+  password  String // bcrypt hashed password
+  fullName  String?      @map("full_name")
+  role      UserRole     @default(agent)
+  levelId   String       @map("level_id") @db.Uuid
+  level     SupportLevel @relation(fields: [levelId], references: [id])
+  avatarUrl String?      @map("avatar_url")
+  isActive  Boolean      @default(true) @map("is_active") // soft delete
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  ticketsAssigned  Ticket[]         @relation("TicketAssignee")
+  ticketsCreated   Ticket[]         @relation("TicketCreator")
+  ticketReplies    TicketReply[]
+  ticketNotes      TicketNote[]
+  ticketActivities TicketActivity[]
+  attachments      Attachment[]
+
+  @@index([levelId])
+  @@map("profiles")
+}
+
+// ============================================
+// CATEGORY
+// ============================================
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String   @unique
+  description String?
+  color       String   @default("#6B7280")
+  icon        String?
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tickets Ticket[]
+
+  @@map("categories")
+}
+
+// ============================================
+// TICKET
+// ============================================
+
+model Ticket {
+  id           String         @id @default(uuid()) @db.Uuid
+  ticketNumber String         @unique @map("ticket_number") // TKT-XXXXXX
+  subject      String
+  description  String
+  status       TicketStatus   @default(open)
+  priority     TicketPriority @default(normal)
+  levelId      String         @map("level_id") @db.Uuid
+  level        SupportLevel   @relation(fields: [levelId], references: [id])
+  source       TicketSource   @default(phone)
+
+  // Customer info (embedded in ticket)
+  customerName    String  @map("customer_name")
+  customerEmail   String  @map("customer_email")
+  customerPhone   String? @map("customer_phone")
+  customerCompany String? @map("customer_company")
+
+  // Relations
+  categoryId  String   @map("category_id") @db.Uuid
+  category    Category @relation(fields: [categoryId], references: [id])
+  assigneeId  String?  @map("assignee_id") @db.Uuid
+  assignee    Profile? @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  createdById String   @map("created_by_id") @db.Uuid
+  createdBy   Profile  @relation("TicketCreator", fields: [createdById], references: [id])
+
+  // Timestamps
+  dueDate    DateTime? @map("due_date")
+  resolvedAt DateTime? @map("resolved_at")
+  closedAt   DateTime? @map("closed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  // Related entities
+  replies     TicketReply[]
+  notes       TicketNote[]
+  activities  TicketActivity[]
+  attachments Attachment[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([levelId])
+  @@index([categoryId])
+  @@index([assigneeId])
+  @@index([createdById])
+  @@index([customerEmail])
+  @@map("tickets")
+}
+
+// ============================================
+// TICKET REPLY (komunikasi ke pelanggan)
+// ============================================
+
+model TicketReply {
+  id          String       @id @default(uuid()) @db.Uuid
+  ticketId    String       @map("ticket_id") @db.Uuid
+  ticket      Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  message     String
+  authorId    String?      @map("author_id") @db.Uuid
+  author      Profile?     @relation(fields: [authorId], references: [id])
+  isCustomer  Boolean      @default(false) @map("is_customer")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  attachments Attachment[]
+
+  @@index([ticketId])
+  @@map("ticket_replies")
+}
+
+// ============================================
+// TICKET NOTE (catatan internal)
+// ============================================
+
+model TicketNote {
+  id          String       @id @default(uuid()) @db.Uuid
+  ticketId    String       @map("ticket_id") @db.Uuid
+  ticket      Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  content     String
+  authorId    String       @map("author_id") @db.Uuid
+  author      Profile      @relation(fields: [authorId], references: [id])
+  createdAt   DateTime     @default(now()) @map("created_at")
+  attachments Attachment[]
+
+  @@index([ticketId])
+  @@map("ticket_notes")
+}
+
+// ============================================
+// TICKET ACTIVITY (log otomatis)
+// ============================================
+
+model TicketActivity {
+  id          String   @id @default(uuid()) @db.Uuid
+  ticketId    String   @map("ticket_id") @db.Uuid
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  type        String // created, status_change, assign, escalate, reply, note
+  description String
+  oldValue    String?  @map("old_value")
+  newValue    String?  @map("new_value")
+  authorId    String   @map("author_id") @db.Uuid
+  author      Profile  @relation(fields: [authorId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@index([type])
+  @@map("ticket_activities")
+}
+
+// ============================================
+// ATTACHMENT (file lampiran)
+// ============================================
+
+model Attachment {
+  id           String       @id @default(uuid()) @db.Uuid
+  ticketId     String?      @map("ticket_id") @db.Uuid
+  ticket       Ticket?      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  replyId      String?      @map("reply_id") @db.Uuid
+  reply        TicketReply? @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  noteId       String?      @map("note_id") @db.Uuid
+  note         TicketNote?  @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  fileName     String       @map("file_name")
+  fileKey      String       @map("file_key") // S3 key
+  fileUrl      String       @map("file_url")
+  fileSize     Int          @map("file_size") // bytes
+  fileType     String       @map("file_type") // MIME type
+  uploadedById String       @map("uploaded_by_id") @db.Uuid
+  uploadedBy   Profile      @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@index([replyId])
+  @@index([noteId])
+  @@map("attachments")
+}

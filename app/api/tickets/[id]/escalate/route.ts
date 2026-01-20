@@ -39,8 +39,9 @@ export async function POST(request: Request, { params }: RouteParams) {
 
         // Permission check - assigned agent or creator can escalate
         if (profile.role !== "admin") {
-            if (ticket.assigneeId !== session.user.id && ticket.createdById !== session.user.id) {
-                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            // Allow if user is assignee OR creator OR ticket is unassigned
+            if (ticket.assigneeId && ticket.assigneeId !== session.user.id && ticket.createdById !== session.user.id) {
+                return NextResponse.json({ error: "Forbidden - Ticket is assigned to another agent" }, { status: 403 });
             }
             // Check if user has permission to escalate
             if (!profile.level.canEscalateTicket) {

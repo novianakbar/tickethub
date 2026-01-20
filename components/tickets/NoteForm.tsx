@@ -11,9 +11,10 @@ import type { PendingAttachment } from "@/types/ticket";
 interface NoteFormProps {
     onSubmit: (content: string, attachments?: PendingAttachment[]) => Promise<boolean>;
     isSubmitting: boolean;
+    readOnly?: boolean;
 }
 
-export function NoteForm({ onSubmit, isSubmitting }: NoteFormProps) {
+export function NoteForm({ onSubmit, isSubmitting, readOnly }: NoteFormProps) {
     const [noteText, setNoteText] = useState("");
     const { files, isUploading, inputRef, triggerUpload, handleFileChange, removeFile, clearFiles } = useFileUpload({
         folder: "notes",
@@ -27,6 +28,16 @@ export function NoteForm({ onSubmit, isSubmitting }: NoteFormProps) {
             clearFiles();
         }
     };
+
+    if (readOnly) {
+        return (
+            <div className="p-4 rounded-lg border bg-muted/30 text-center">
+                <p className="text-sm text-muted-foreground">
+                    Form catatan dinonaktifkan karena tiket sedang dikerjakan oleh agen lain.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-3">

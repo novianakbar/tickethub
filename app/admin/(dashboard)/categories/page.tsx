@@ -1,18 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { AdminHeader } from "@/components/layout/AdminHeader";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { TableCard } from "@/components/ui/table-card";
 import {
     Dialog,
     DialogContent,
@@ -30,6 +24,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { toast } from "sonner";
 import {
     Plus,
@@ -40,8 +35,6 @@ import {
     Tag,
     ToggleLeft,
     ToggleRight,
-    Eye,
-    EyeOff,
     Palette,
     Hash,
 } from "lucide-react";
@@ -58,6 +51,13 @@ interface Category {
     sortOrder: number;
     createdAt: string;
     updatedAt: string;
+}
+
+interface PaginationData {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
 }
 
 // Preset colors for quick selection
@@ -98,17 +98,39 @@ export default function AdminCategoriesPage() {
     const [formDescription, setFormDescription] = useState("");
     const [formColor, setFormColor] = useState("#3B82F6");
 
-    // Stats
-    const activeCount = categories.filter((c) => c.isActive).length;
-    const inactiveCount = categories.filter((c) => !c.isActive).length;
+    // Pagination state
+    const [pagination, setPagination] = useState<PaginationData>({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 1,
+    });
 
     // Fetch categories
     const fetchCategories = useCallback(async () => {
+        setIsLoading(true);
         try {
-            const res = await fetch("/api/categories");
+            const params = new URLSearchParams();
+            params.set("page", pagination.page.toString());
+            params.set("limit", pagination.limit.toString());
+
+            const res = await fetch(`/api/categories?${params.toString()}`);
             if (res.ok) {
-                const { categories } = await res.json();
-                setCategories(categories);
+                const data = await res.json();
+                setCategories(data.categories || []);
+                if (data.pagination) {
+                    setPagination((prev) => ({
+                        ...prev,
+                        total: data.pagination.total,
+                        totalPages: data.pagination.totalPages,
+                    }));
+                } else {
+                    setPagination((prev) => ({
+                        ...prev,
+                        total: data.categories?.length || 0,
+                        totalPages: 1,
+                    }));
+                }
             }
         } catch (error) {
             console.error("Failed to fetch categories:", error);
@@ -116,11 +138,20 @@ export default function AdminCategoriesPage() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [pagination.page, pagination.limit]);
 
     useEffect(() => {
         fetchCategories();
     }, [fetchCategories]);
+
+    // Pagination handlers
+    const handlePageChange = (page: number) => {
+        setPagination((prev) => ({ ...prev, page }));
+    };
+
+    const handlePageSizeChange = (limit: number) => {
+        setPagination((prev) => ({ ...prev, limit, page: 1 }));
+    };
 
     // Open dialog for create
     const handleOpenCreate = () => {
@@ -249,223 +280,170 @@ export default function AdminCategoriesPage() {
     };
 
     return (
-        <>
-            <AdminHeader
+        <div className="flex-1 p-6">
+            <PageHeader
                 title="Kategori"
                 description="Kelola kategori untuk mengelompokkan tiket"
             />
 
-            <div className="flex-1 overflow-auto p-6">
-                {/* Stats Cards */}
-                <div className="mb-6 grid gap-4 sm:grid-cols-3">
-                    <Card className="border-l-4 border-l-primary">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Total Kategori</p>
-                                    <p className="text-2xl font-bold">{categories.length}</p>
-                                </div>
-                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                    <Tag className="h-5 w-5" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-l-4 border-l-green-500">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Aktif</p>
-                                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{activeCount}</p>
-                                </div>
-                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
-                                    <Eye className="h-5 w-5" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-l-4 border-l-gray-400">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Nonaktif</p>
-                                    <p className="text-2xl font-bold text-muted-foreground">{inactiveCount}</p>
-                                </div>
-                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                                    <EyeOff className="h-5 w-5" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Main Content */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                <Tag className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <CardTitle className="text-lg">Daftar Kategori</CardTitle>
-                                <CardDescription>
-                                    Kategori digunakan untuk mengelompokkan tiket berdasarkan jenis permasalahan
-                                </CardDescription>
-                            </div>
-                        </div>
-                        <Button onClick={handleOpenCreate} className="gap-2">
-                            <Plus className="h-4 w-4" />
-                            Tambah Kategori
+            <TableCard
+                title="Daftar Kategori"
+                description="Kategori digunakan untuk mengelompokkan tiket berdasarkan jenis permasalahan"
+                icon={Tag}
+                isLoading={isLoading}
+                isEmpty={categories.length === 0}
+                emptyState={{
+                    icon: FolderOpen,
+                    title: "Belum ada kategori",
+                    description: "Kategori membantu mengelompokkan tiket berdasarkan jenis permasalahan untuk penanganan yang lebih efisien.",
+                    action: (
+                        <Button onClick={handleOpenCreate}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Buat Kategori Pertama
                         </Button>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        {isLoading ? (
-                            <div className="flex items-center justify-center py-16">
-                                <div className="flex flex-col items-center gap-3">
-                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                    <p className="text-sm text-muted-foreground">Memuat kategori...</p>
-                                </div>
-                            </div>
-                        ) : categories.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-center">
-                                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                                    <FolderOpen className="h-8 w-8 text-muted-foreground" />
-                                </div>
-                                <h3 className="mb-1 font-semibold">Belum ada kategori</h3>
-                                <p className="mb-4 max-w-sm text-sm text-muted-foreground">
-                                    Kategori membantu mengelompokkan tiket berdasarkan jenis permasalahan untuk penanganan yang lebih efisien.
-                                </p>
-                                <Button onClick={handleOpenCreate}>
-                                    <Plus className="h-4 w-4" />
-                                    Buat Kategori Pertama
-                                </Button>
-                            </div>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/50">
-                                        <TableHead className="w-12">#</TableHead>
-                                        <TableHead>Kategori</TableHead>
-                                        <TableHead>Deskripsi</TableHead>
-                                        <TableHead className="w-24 text-center">Warna</TableHead>
-                                        <TableHead className="w-24 text-center">Status</TableHead>
-                                        <TableHead className="w-32 text-center">Dibuat</TableHead>
-                                        <TableHead className="w-28 text-right">Aksi</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {categories.map((category, index) => (
-                                        <TableRow
-                                            key={category.id}
-                                            className={cn(
-                                                "group transition-colors",
-                                                !category.isActive && "bg-muted/30 opacity-60"
-                                            )}
+                    ),
+                }}
+                action={
+                    <Button onClick={handleOpenCreate} className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Tambah Kategori
+                    </Button>
+                }
+                footer={
+                    pagination.totalPages > 0 && (
+                        <DataTablePagination
+                            pageIndex={pagination.page}
+                            pageSize={pagination.limit}
+                            rowCount={pagination.total}
+                            pageCount={pagination.totalPages}
+                            onPageChange={handlePageChange}
+                            onPageSizeChange={handlePageSizeChange}
+                        />
+                    )
+                }
+            >
+                <Table>
+                    <TableHeader>
+                        <TableRow className="bg-muted/50">
+                            <TableHead className="w-12">#</TableHead>
+                            <TableHead>Kategori</TableHead>
+                            <TableHead>Deskripsi</TableHead>
+                            <TableHead className="w-24 text-center">Warna</TableHead>
+                            <TableHead className="w-24 text-center">Status</TableHead>
+                            <TableHead className="w-32 text-center">Dibuat</TableHead>
+                            <TableHead className="w-28 text-right">Aksi</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {categories.map((category, index) => (
+                            <TableRow
+                                key={category.id}
+                                className={cn(
+                                    "group transition-colors",
+                                    !category.isActive && "bg-muted/30 opacity-60"
+                                )}
+                            >
+                                <TableCell className="text-muted-foreground font-mono text-sm">
+                                    {(pagination.page - 1) * pagination.limit + index + 1}
+                                </TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-3">
+                                        <div
+                                            className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+                                            style={{ backgroundColor: category.color + "20" }}
                                         >
-                                            <TableCell className="text-muted-foreground font-mono text-sm">
-                                                {index + 1}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-3">
-                                                    <div
-                                                        className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
-                                                        style={{ backgroundColor: category.color + "20" }}
-                                                    >
-                                                        <div
-                                                            className="h-3 w-3 rounded-full"
-                                                            style={{ backgroundColor: category.color }}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium">{category.name}</p>
-                                                        <p className="text-xs text-muted-foreground font-mono">
-                                                            {category.slug}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="max-w-[200px]">
-                                                {category.description ? (
-                                                    <p className="text-sm text-muted-foreground truncate">
-                                                        {category.description}
-                                                    </p>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground/50 italic">
-                                                        Tidak ada deskripsi
-                                                    </span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    <div
-                                                        className="h-4 w-4 rounded border"
-                                                        style={{ backgroundColor: category.color }}
-                                                    />
-                                                    <span className="font-mono text-xs text-muted-foreground">
-                                                        {category.color}
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge
-                                                    variant={category.isActive ? "default" : "secondary"}
-                                                    className={cn(
-                                                        "text-xs",
-                                                        category.isActive
-                                                            ? "bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400"
-                                                            : ""
-                                                    )}
-                                                >
-                                                    {category.isActive ? "Aktif" : "Nonaktif"}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-center text-sm text-muted-foreground">
-                                                {formatDate(category.createdAt)}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon-sm"
-                                                        onClick={() => handleToggleActive(category)}
-                                                        title={category.isActive ? "Nonaktifkan" : "Aktifkan"}
-                                                        className="h-8 w-8"
-                                                    >
-                                                        {category.isActive ? (
-                                                            <ToggleRight className="h-4 w-4 text-green-600" />
-                                                        ) : (
-                                                            <ToggleLeft className="h-4 w-4 text-muted-foreground" />
-                                                        )}
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon-sm"
-                                                        onClick={() => handleOpenEdit(category)}
-                                                        className="h-8 w-8"
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon-sm"
-                                                        onClick={() => {
-                                                            setDeletingCategory(category);
-                                                            setIsDeleteDialogOpen(true);
-                                                        }}
-                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
+                                            <div
+                                                className="h-3 w-3 rounded-full"
+                                                style={{ backgroundColor: category.color }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium">{category.name}</p>
+                                            <p className="text-xs text-muted-foreground font-mono">
+                                                {category.slug}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </TableCell>
+                                <TableCell className="max-w-[200px]">
+                                    {category.description ? (
+                                        <p className="text-sm text-muted-foreground truncate">
+                                            {category.description}
+                                        </p>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground/50 italic">
+                                            Tidak ada deskripsi
+                                        </span>
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                        <div
+                                            className="h-4 w-4 rounded border"
+                                            style={{ backgroundColor: category.color }}
+                                        />
+                                        <span className="font-mono text-xs text-muted-foreground">
+                                            {category.color}
+                                        </span>
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                    <Badge
+                                        variant={category.isActive ? "default" : "secondary"}
+                                        className={cn(
+                                            "text-xs",
+                                            category.isActive
+                                                ? "bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400"
+                                                : ""
+                                        )}
+                                    >
+                                        {category.isActive ? "Aktif" : "Nonaktif"}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-center text-sm text-muted-foreground">
+                                    {formatDate(category.createdAt)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            onClick={() => handleToggleActive(category)}
+                                            title={category.isActive ? "Nonaktifkan" : "Aktifkan"}
+                                            className="h-8 w-8"
+                                        >
+                                            {category.isActive ? (
+                                                <ToggleRight className="h-4 w-4 text-green-600" />
+                                            ) : (
+                                                <ToggleLeft className="h-4 w-4 text-muted-foreground" />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            onClick={() => handleOpenEdit(category)}
+                                            className="h-8 w-8"
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            onClick={() => {
+                                                setDeletingCategory(category);
+                                                setIsDeleteDialogOpen(true);
+                                            }}
+                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableCard>
 
             {/* Create/Edit Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -654,6 +632,6 @@ export default function AdminCategoriesPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </>
+        </div>
     );
 }

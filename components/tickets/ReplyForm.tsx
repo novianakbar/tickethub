@@ -11,9 +11,10 @@ import type { PendingAttachment } from "@/types/ticket";
 interface ReplyFormProps {
     onSubmit: (message: string, attachments?: PendingAttachment[]) => Promise<boolean>;
     isSubmitting: boolean;
+    readOnly?: boolean;
 }
 
-export function ReplyForm({ onSubmit, isSubmitting }: ReplyFormProps) {
+export function ReplyForm({ onSubmit, isSubmitting, readOnly }: ReplyFormProps) {
     const [replyText, setReplyText] = useState("");
     const { files, isUploading, inputRef, triggerUpload, handleFileChange, removeFile, clearFiles } = useFileUpload({
         folder: "replies",
@@ -27,6 +28,16 @@ export function ReplyForm({ onSubmit, isSubmitting }: ReplyFormProps) {
             clearFiles();
         }
     };
+
+    if (readOnly) {
+        return (
+            <div className="p-4 rounded-lg border bg-muted/30 text-center">
+                <p className="text-sm text-muted-foreground">
+                    Form balasan dinonaktifkan karena tiket sedang dikerjakan oleh agen lain.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-3">

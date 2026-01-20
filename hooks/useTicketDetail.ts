@@ -16,6 +16,7 @@ interface UseTicketDetailReturn {
     handleStatusChange: (newStatus: string) => Promise<void>;
     handlePriorityChange: (newPriority: string) => Promise<void>;
     handleEscalate: () => Promise<void>;
+    handleAssigneeChange: (assigneeId: string | null, note?: string) => Promise<boolean>;
     handleSendReply: (message: string, attachments?: PendingAttachment[]) => Promise<boolean>;
     handleAddNote: (content: string, attachments?: PendingAttachment[]) => Promise<boolean>;
     handleUploadAttachments: (files: PendingAttachment[]) => Promise<boolean>;
@@ -50,6 +51,18 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
 
     const handleStatusChange = useCallback(async (newStatus: string) => {
         if (!ticket) return;
+        
+        const statusLabels: Record<string, string> = {
+            open: "Baru",
+            in_progress: "Diproses",
+            pending: "Menunggu Info",
+            resolved: "Selesai",
+            closed: "Ditutup",
+        };
+        const newLabel = statusLabels[newStatus] || newStatus;
+        
+        const toastId = toast.loading(`Mengubah status ke ${newLabel}...`);
+        
         try {
             const res = await fetch(`/api/tickets/${ticketId}`, {
                 method: "PUT",
@@ -57,18 +70,31 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
                 body: JSON.stringify({ status: newStatus }),
             });
             if (res.ok) {
-                toast.success("Status berhasil diubah");
+                toast.success(`Status berhasil diubah menjadi ${newLabel}`, { id: toastId });
                 refetch();
             } else {
-                toast.error("Gagal mengubah status");
+                const data = await res.json();
+                toast.error(data.error || "Gagal mengubah status", { id: toastId });
             }
         } catch (error) {
             console.error("Update error:", error);
+            toast.error("Terjadi kesalahan saat mengubah status", { id: toastId });
         }
     }, [ticket, ticketId, refetch]);
 
     const handlePriorityChange = useCallback(async (newPriority: string) => {
         if (!ticket) return;
+        
+        const priorityLabels: Record<string, string> = {
+            low: "Rendah",
+            normal: "Normal",
+            high: "Tinggi",
+            urgent: "Mendesak",
+        };
+        const newLabel = priorityLabels[newPriority] || newPriority;
+        
+        const toastId = toast.loading(`Mengubah prioritas ke ${newLabel}...`);
+        
         try {
             const res = await fetch(`/api/tickets/${ticketId}`, {
                 method: "PUT",
@@ -76,18 +102,26 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
                 body: JSON.stringify({ priority: newPriority }),
             });
             if (res.ok) {
-                toast.success("Prioritas berhasil diubah");
+                toast.success(`Prioritas berhasil diubah menjadi ${newLabel}`, { id: toastId });
                 refetch();
             } else {
-                toast.error("Gagal mengubah prioritas");
+                const data = await res.json();
+                toast.error(data.error || "Gagal mengubah prioritas", { id: toastId });
             }
         } catch (error) {
             console.error("Update error:", error);
+            toast.error("Terjadi kesalahan saat mengubah prioritas", { id: toastId });
         }
     }, [ticket, ticketId, refetch]);
 
     const handleEscalate = useCallback(async () => {
         if (!ticket) return;
+        
+        const currentLevel = ticket.level?.code || "L1";
+        const nextLevel = currentLevel === "L1" ? "L2" : "L3";
+        
+        const toastId = toast.loading(`Mengeskasikan tiket ke ${nextLevel}...`);
+        
         try {
             const res = await fetch(`/api/tickets/${ticketId}/escalate`, {
                 method: "POST",
@@ -95,20 +129,50 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
                 body: JSON.stringify({}),
             });
             if (res.ok) {
-                toast.success("Tiket berhasil dieskalasi");
+                toast.success(`Tiket berhasil dieskalasi ke ${nextLevel}`, { id: toastId });
                 refetch();
             } else {
                 const error = await res.json();
-                toast.error(error.error || "Gagal eskalasi");
+                toast.error(error.error || "Gagal eskalasi", { id: toastId });
             }
         } catch (error) {
             console.error("Escalate error:", error);
+            toast.error("Terjadi kesalahan saat eskalasi", { id: toastId });
         }
     }, [ticket, ticketId, refetch]);
+
+    const handleAssigneeChange = useCallback(async (assigneeId: string | null, note?: string): Promise<boolean> => {
+        const toastId = toast.loading("Menugaskan tiket...");
+        
+        try {
+            const res = await fetch(`/api/tickets/${ticketId}/assign`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ assigneeId, note }),
+            });
+            
+            if (res.ok) {
+                toast.success(assigneeId ? "Tiket berhasil ditugaskan" : "Penugasan tiket dihapus", { id: toastId });
+                refetch();
+                return true;
+            } else {
+                const data = await res.json();
+                toast.error(data.error || "Gagal menugaskan tiket", { id: toastId });
+                return false;
+            }
+        } catch (error) {
+            console.error("Assign error:", error);
+            toast.error("Terjadi kesalahan saat menugaskan tiket", { id: toastId });
+            return false;
+        }
+    }, [ticketId, refetch]);
 
     const handleSendReply = useCallback(async (message: string, attachments?: PendingAttachment[]): Promise<boolean> => {
         if (!message.trim()) return false;
         setIsSubmitting(true);
+        
+        const toastId = toast.loading("Mengirim balasan...");
+        
         try {
             const res = await fetch(`/api/tickets/${ticketId}/reply`, {
                 method: "POST",
@@ -119,15 +183,17 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
                 }),
             });
             if (res.ok) {
-                toast.success("Balasan berhasil dikirim");
+                toast.success("Balasan berhasil dikirim", { id: toastId });
                 refetch();
                 return true;
             } else {
-                toast.error("Gagal mengirim balasan");
+                const data = await res.json();
+                toast.error(data.error || "Gagal mengirim balasan", { id: toastId });
                 return false;
             }
         } catch (error) {
             console.error("Reply error:", error);
+            toast.error("Terjadi kesalahan saat mengirim balasan", { id: toastId });
             return false;
         } finally {
             setIsSubmitting(false);
@@ -137,6 +203,9 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
     const handleAddNote = useCallback(async (content: string, attachments?: PendingAttachment[]): Promise<boolean> => {
         if (!content.trim()) return false;
         setIsSubmitting(true);
+        
+        const toastId = toast.loading("Menambahkan catatan...");
+        
         try {
             const res = await fetch(`/api/tickets/${ticketId}/note`, {
                 method: "POST",
@@ -147,15 +216,16 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
                 }),
             });
             if (res.ok) {
-                toast.success("Catatan berhasil ditambahkan");
+                toast.success("Catatan berhasil ditambahkan", { id: toastId });
                 refetch();
                 return true;
             } else {
-                toast.error("Gagal menambah catatan");
+                toast.error("Gagal menambah catatan", { id: toastId });
                 return false;
             }
         } catch (error) {
             console.error("Note error:", error);
+            toast.error("Terjadi kesalahan saat menambah catatan", { id: toastId });
             return false;
         } finally {
             setIsSubmitting(false);
@@ -213,6 +283,7 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
         handleStatusChange,
         handlePriorityChange,
         handleEscalate,
+        handleAssigneeChange,
         handleSendReply,
         handleAddNote,
         handleUploadAttachments,

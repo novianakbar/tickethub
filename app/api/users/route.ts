@@ -3,15 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
-
-function generateRandomPassword(length = 12) {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
-    let password = "";
-    for (let i = 0; i < length; i++) {
-        password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
-}
+import { notifyUserAccountCreated } from "@/lib/email-service";
+import { generateRandomPassword } from "@/lib/utils";
 
 function isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -174,8 +167,20 @@ export async function POST(request: NextRequest) {
             },
         });
 
-        // TODO: Send password to email (SMTP integration)
-        // For now, return password in response (should be removed in production)
+        // Send welcome email with login credentials (fire-and-forget)
+        notifyUserAccountCreated(
+            {
+                id: user.id,
+                email: user.email,
+                fullName: user.fullName,
+                username: user.username,
+                role: user.role,
+                level: user.level,
+            },
+            password
+        );
+
+        // Return password in response as fallback if email fails
         return NextResponse.json({ user, tempPassword: password }, { status: 201 });
     } catch (error) {
         console.error("User create error:", error);

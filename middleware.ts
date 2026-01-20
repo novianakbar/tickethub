@@ -1,6 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
+// RBAC: Routes that require admin role
+const ADMIN_ONLY_ROUTES = [
+    "/admin/users",
+    "/admin/categories",
+    "/admin/support-levels",
+    "/admin/templates",
+    "/admin/email-templates",
+    "/admin/attachments",
+];
+
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
@@ -16,6 +26,17 @@ export async function middleware(request: NextRequest) {
             const loginUrl = new URL("/admin/login", request.url);
             loginUrl.searchParams.set("callbackUrl", pathname);
             return NextResponse.redirect(loginUrl);
+        }
+
+        // RBAC: Check admin-only routes
+        const isAdminOnlyRoute = ADMIN_ONLY_ROUTES.some(
+            (route) => pathname === route || pathname.startsWith(route + "/")
+        );
+
+        if (isAdminOnlyRoute && token.role !== "admin") {
+            // Redirect non-admin to dashboard with access denied flag
+            const dashboardUrl = new URL("/admin?access=denied", request.url);
+            return NextResponse.redirect(dashboardUrl);
         }
     }
 

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateTicketNumber, createTicketActivity } from "@/lib/ticket-utils";
+import { notifyTicketCreated } from "@/lib/email-service";
 import type { TicketStatus, TicketPriority, TicketSource } from "@prisma/client";
 
 // GET /api/tickets - List tickets with filters
@@ -157,6 +158,7 @@ export async function POST(request: Request) {
             priority = "normal",
             levelId, // Now using levelId instead of level enum
             source = "phone",
+            sourceNotes,
             customerName,
             customerEmail,
             customerPhone,
@@ -211,6 +213,7 @@ export async function POST(request: Request) {
                 priority: priority as TicketPriority,
                 levelId,
                 source: source as TicketSource,
+                sourceNotes: sourceNotes || null,
                 customerName,
                 customerEmail,
                 customerPhone,
@@ -259,6 +262,9 @@ export async function POST(request: Request) {
             type: "created",
             description: "Tiket berhasil dibuat",
         });
+
+        // Send email notification to customer (async, no await to not block response)
+        notifyTicketCreated(ticket);
 
         return NextResponse.json({ ticket }, { status: 201 });
     } catch (error) {

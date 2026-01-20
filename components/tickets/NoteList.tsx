@@ -31,7 +31,7 @@ export function NoteList({ notes, onViewAttachment }: NoteListProps) {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
             {notes.map((note) => (
                 <div key={note.id} className="rounded-lg border-l-2 border-l-amber-500 bg-amber-50/50 dark:bg-amber-900/10 p-4">
                     <div className="flex items-center justify-between mb-2">

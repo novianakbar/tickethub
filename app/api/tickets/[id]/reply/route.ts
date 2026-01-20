@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createTicketActivity } from "@/lib/ticket-utils";
 import { getFreshFileUrl } from "@/lib/s3";
+import { notifyNewReply } from "@/lib/email-service";
 
 type RouteParams = {
     params: Promise<{ id: string }>;
@@ -46,8 +47,9 @@ export async function POST(request: Request, { params }: RouteParams) {
 
         // Permission check
         if (profile.role !== "admin") {
-            if (ticket.assigneeId !== session.user.id && ticket.createdById !== session.user.id) {
-                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            // Allow if user is assignee OR creator OR ticket is unassigned
+            if (ticket.assigneeId && ticket.assigneeId !== session.user.id && ticket.createdById !== session.user.id) {
+                return NextResponse.json({ error: "Forbidden - Ticket is assigned to another agent" }, { status: 403 });
             }
         }
 
@@ -101,11 +103,22 @@ export async function POST(request: Request, { params }: RouteParams) {
             });
         });
 
-        // Update ticket to in_progress if still open
+        // Update ticket status or assignee
+        const updateData: Record<string, unknown> = {};
+
         if (ticket.status === "open") {
+            updateData.status = "in_progress";
+        }
+
+        // Auto-assign if currently unassigned and user is acting on it
+        if (!ticket.assigneeId && profile.role !== "admin") {
+            updateData.assigneeId = session.user.id;
+        }
+
+        if (Object.keys(updateData).length > 0) {
             await prisma.ticket.update({
                 where: { id },
-                data: { status: "in_progress" },
+                data: updateData,
             });
         }
 
@@ -122,6 +135,18 @@ export async function POST(request: Request, { params }: RouteParams) {
             description: activityDesc,
         });
 
+        // Log assignment if happened
+        if (!ticket.assigneeId && profile.role !== "admin") {
+            await createTicketActivity({
+                ticketId: id,
+                authorId: session.user.id,
+                type: "assign",
+                description: `Tiket otomatis diambil oleh ${profile.fullName || session.user.email} (via Balasan)`,
+                oldValue: undefined,
+                newValue: session.user.id,
+            });
+        }
+
         // Regenerate fresh URLs for attachments
         const replyWithFreshUrls = reply ? {
             ...reply,
@@ -132,6 +157,25 @@ export async function POST(request: Request, { params }: RouteParams) {
                 }))
             ),
         } : reply;
+
+        // Send email notification to customer (async, no await)
+        if (reply) {
+            const ticketForEmail = await prisma.ticket.findUnique({
+                where: { id },
+                include: {
+                    category: true,
+                    assignee: true,
+                    createdBy: true,
+                },
+            });
+
+            if (ticketForEmail) {
+                notifyNewReply(ticketForEmail, {
+                    ...reply,
+                    author: reply.author,
+                });
+            }
+        }
 
         return NextResponse.json({ reply: replyWithFreshUrls }, { status: 201 });
     } catch (error) {

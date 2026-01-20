@@ -7,7 +7,6 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
     try {
         const levels = await prisma.supportLevel.findMany({
-            where: { isActive: true },
             orderBy: { sortOrder: "asc" },
             select: {
                 id: true,
@@ -23,6 +22,7 @@ export async function GET() {
                 canEscalateTicket: true,
                 canResolveTicket: true,
                 canCloseTicket: true,
+                isActive: true,
             },
         });
 

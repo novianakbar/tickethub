@@ -15,6 +15,8 @@ export interface CreateTicketFormData {
     priority: string;
     levelId: string; // Changed from level to levelId
     source: string;
+    sourceNotes: string;
+    dueDate: string; // ISO date string or empty for auto-calculate
 }
 
 // Form validation errors
@@ -38,9 +40,12 @@ export interface CategoryOption {
 
 // Quick template for common ticket types
 export interface QuickTemplate {
-    label: string;
+    id: string;
+    name: string; // was label
     subject: string;
-    description: string;
+    content: string; // was description
+    priority: string;
+    categoryId?: string | null;
 }
 
 // Priority option with styling
@@ -64,6 +69,13 @@ export interface SourceOption {
     label: string;
 }
 
+// SLA Config type
+export interface SLAConfig {
+    id: string;
+    priority: string;
+    durationHrs: number;
+}
+
 // Hook return type
 export interface UseCreateTicketReturn {
     // Form state
@@ -75,6 +87,8 @@ export interface UseCreateTicketReturn {
     // Categories & Levels
     categories: CategoryOption[];
     levels: LevelOption[];
+    templates: QuickTemplate[];
+    slaConfigs: SLAConfig[];
 
     // File upload
     uploadedFiles: PendingAttachment[];
@@ -95,6 +109,7 @@ export interface UseCreateTicketReturn {
 
     // Form actions
     updateField: (field: string, value: string) => void;
+    handleDueDateChange: (value: string) => void;
     applyTemplate: (template: QuickTemplate) => void;
     handleSubmit: (e: React.FormEvent) => Promise<void>;
 }

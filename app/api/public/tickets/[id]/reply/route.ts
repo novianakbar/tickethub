@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { notifyAgentCustomerReply } from "@/lib/email-service";
 
 type RouteParams = {
     params: Promise<{ id: string }>;
@@ -60,11 +61,11 @@ export async function POST(request: Request, { params }: RouteParams) {
         // Use createdById for activity logging (the agent who created the ticket)
         const activityAuthorId = ticket.createdById;
 
-        // Update ticket status to pending if it was resolved/closed
-        if (ticket.status === "resolved" || ticket.status === "closed") {
+        // Update ticket status to open if it was resolved/closed/pending (Reopen/Customer replied)
+        if (["resolved", "closed", "pending"].includes(ticket.status)) {
             await prisma.ticket.update({
                 where: { id },
-                data: { status: "pending" },
+                data: { status: "open" },
             });
 
             // Log status change activity
@@ -73,9 +74,9 @@ export async function POST(request: Request, { params }: RouteParams) {
                     ticketId: id,
                     authorId: activityAuthorId,
                     type: "status_change",
-                    description: "Status diubah ke Menunggu Respons (balasan pelanggan)",
+                    description: "Status berubah menjadi Open (Respons Pelanggan)",
                     oldValue: ticket.status,
-                    newValue: "pending",
+                    newValue: "open",
                 },
             });
         }
@@ -89,6 +90,28 @@ export async function POST(request: Request, { params }: RouteParams) {
                 description: "Pelanggan memberikan balasan",
             },
         });
+
+        // Send email notification to assigned agent (async, no await)
+        const ticketForEmail = await prisma.ticket.findUnique({
+            where: { id },
+            include: {
+                category: true,
+                assignee: true,
+                createdBy: true,
+            },
+        });
+
+        if (ticketForEmail) {
+            notifyAgentCustomerReply(ticketForEmail, {
+                id: reply.id,
+                ticketId: id,
+                message: reply.message,
+                authorId: null,
+                isCustomer: true,
+                createdAt: reply.createdAt,
+                author: null,
+            });
+        }
 
         return NextResponse.json({
             success: true,

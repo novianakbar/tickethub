@@ -22,10 +22,19 @@ const defaultFormData: CreateTicketFormData = {
     subject: "",
     description: "",
     categoryId: "",
-    priority: "normal",
-    levelId: "", // Will be set after fetching levels
-    source: "phone",
+    priority: "", // Empty - agent must select
+    levelId: "", // Empty - agent must select
+    source: "", // Empty - agent must select
+    sourceNotes: "",
+    dueDate: "", // Empty = auto-calculate from SLA when priority selected
 };
+
+// SLA Config type
+interface SLAConfig {
+    id: string;
+    priority: string;
+    durationHrs: number;
+}
 
 export function useCreateTicket(): UseCreateTicketReturn {
     const router = useRouter();
@@ -40,6 +49,11 @@ export function useCreateTicket(): UseCreateTicketReturn {
     // Categories & Levels
     const [categories, setCategories] = useState<CategoryOption[]>([]);
     const [levels, setLevels] = useState<LevelOption[]>([]);
+    const [templates, setTemplates] = useState<QuickTemplate[]>([]);
+
+    // SLA configs
+    const [slaConfigs, setSlaConfigs] = useState<SLAConfig[]>([]);
+    const [dueDateManuallySet, setDueDateManuallySet] = useState(false);
 
     // File upload
     const [uploadedFiles, setUploadedFiles] = useState<PendingAttachment[]>([]);
@@ -70,20 +84,67 @@ export function useCreateTicket(): UseCreateTicketReturn {
             if (res.ok) {
                 const data = await res.json();
                 setLevels(data.levels);
-                // Set default levelId to first level (L1) if available
-                if (data.levels.length > 0 && !formData.levelId) {
-                    setFormData(prev => ({ ...prev, levelId: data.levels[0].id }));
-                }
+                // Don't auto-set levelId - agent must select manually
             }
         } catch (error) {
             console.error("Failed to fetch levels:", error);
         }
-    }, [formData.levelId]);
+    }, []);
+
+    // Fetch templates (only active ones for ticket creation)
+    const fetchTemplates = useCallback(async () => {
+        try {
+            const res = await fetch("/api/templates?active=true");
+            if (res.ok) {
+                const data = await res.json();
+                // API now returns { templates: [...], pagination: {...} }
+                setTemplates(data.templates || []);
+            }
+        } catch (error) {
+            console.error("Failed to fetch templates:", error);
+        }
+    }, []);
+
+
+    // Fetch SLA configs
+    const fetchSLAConfigs = useCallback(async () => {
+        try {
+            const res = await fetch("/api/settings/sla");
+            if (res.ok) {
+                const data = await res.json();
+                setSlaConfigs(data.configs);
+            }
+        } catch (error) {
+            console.error("Failed to fetch SLA configs:", error);
+        }
+    }, []);
 
     useEffect(() => {
         fetchCategories();
         fetchLevels();
-    }, [fetchCategories, fetchLevels]);
+        fetchTemplates();
+        fetchSLAConfigs();
+    }, [fetchCategories, fetchLevels, fetchTemplates, fetchSLAConfigs]);
+
+    // Auto-calculate due date when priority changes (if not manually set)
+    useEffect(() => {
+        if (dueDateManuallySet || slaConfigs.length === 0 || !formData.priority) return;
+
+        const slaConfig = slaConfigs.find(c => c.priority === formData.priority);
+        if (slaConfig) {
+            const now = new Date();
+            now.setHours(now.getHours() + slaConfig.durationHrs);
+            // Format as datetime-local value in LOCAL timezone (not UTC)
+            // datetime-local expects YYYY-MM-DDTHH:mm format
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const dueDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+            setFormData(prev => ({ ...prev, dueDate }));
+        }
+    }, [formData.priority, slaConfigs, dueDateManuallySet]);
 
     // Search existing customers by email
     const searchCustomer = useCallback(async (email: string) => {
@@ -135,6 +196,12 @@ export function useCreateTicket(): UseCreateTicketReturn {
         });
     }, []);
 
+    // Handle due date change (marks as manually set)
+    const handleDueDateChange = useCallback((value: string) => {
+        setDueDateManuallySet(value !== "");
+        setFormData((prev) => ({ ...prev, dueDate: value }));
+    }, []);
+
     // Select customer suggestion
     const selectCustomerSuggestion = useCallback((customer: CustomerSuggestion) => {
         setFormData((prev) => ({
@@ -153,9 +220,11 @@ export function useCreateTicket(): UseCreateTicketReturn {
         setFormData((prev) => ({
             ...prev,
             subject: template.subject,
-            description: template.description,
+            description: template.content,
+            priority: template.priority,
+            categoryId: template.categoryId || prev.categoryId,
         }));
-        toast.success(`Template "${template.label}" diterapkan`);
+        toast.success(`Template "${template.name}" diterapkan`);
     }, []);
 
     // Validate form
@@ -179,8 +248,14 @@ export function useCreateTicket(): UseCreateTicketReturn {
         if (!formData.categoryId) {
             newErrors.categoryId = "Kategori wajib dipilih";
         }
+        if (!formData.source) {
+            newErrors.source = "Sumber wajib dipilih";
+        }
         if (!formData.levelId) {
             newErrors.levelId = "Level wajib dipilih";
+        }
+        if (!formData.priority) {
+            newErrors.priority = "Prioritas wajib dipilih";
         }
 
         setErrors(newErrors);
@@ -323,6 +398,8 @@ export function useCreateTicket(): UseCreateTicketReturn {
         // Categories & Levels
         categories,
         levels,
+        templates,
+        slaConfigs,
 
         // File upload
         uploadedFiles,
@@ -343,6 +420,7 @@ export function useCreateTicket(): UseCreateTicketReturn {
 
         // Form actions
         updateField,
+        handleDueDateChange,
         applyTemplate,
         handleSubmit,
     };

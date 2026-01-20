@@ -27,29 +27,29 @@ export interface PriorityConfig {
 
 export const statusConfig: Record<TicketStatus, StatusConfig> = {
     open: {
-        label: "Menunggu",
+        label: "Baru",
         className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-        description: "Tiket menunggu untuk diproses",
+        description: "Tiket baru atau menunggu tindakan agen",
     },
     in_progress: {
         label: "Diproses",
-        className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-        description: "Tiket sedang dikerjakan",
+        className: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+        description: "Tiket sedang dikerjakan oleh agen",
     },
     pending: {
-        label: "Pending",
+        label: "Menunggu Info",
         className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-        description: "Tiket menunggu tindakan lanjutan",
+        description: "Menunggu respons atau informasi dari pelanggan",
     },
     resolved: {
         label: "Selesai",
         className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-        description: "Tiket telah diselesaikan",
+        description: "Masalah telah diselesaikan",
     },
     closed: {
         label: "Ditutup",
         className: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400",
-        description: "Tiket telah ditutup",
+        description: "Tiket telah ditutup secara permanen",
     },
 };
 

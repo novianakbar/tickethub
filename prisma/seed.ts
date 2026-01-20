@@ -3,6 +3,8 @@ import { PrismaClient, TicketStatus, TicketPriority, TicketSource } from "@prism
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
+import * as fs from "fs";
+import * as path from "path";
 
 // Create Prisma client with pg adapter
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -99,6 +101,130 @@ const defaultCategories = [
     { name: "Perubahan Data", slug: "perubahan-data", description: "Permintaan perubahan atau update data", color: "#F97316", sortOrder: 3 },
     { name: "Informasi", slug: "informasi", description: "Pertanyaan umum dan permintaan informasi", color: "#6366F1", sortOrder: 4 },
     { name: "Lainnya", slug: "lainnya", description: "Kategori untuk tiket yang tidak termasuk kategori di atas", color: "#6B7280", sortOrder: 5 },
+];
+
+// Quick Templates
+const defaultTemplates = [
+    {
+        name: "Reset Password",
+        subject: "Permintaan Reset Password",
+        content: "Pelanggan meminta reset password untuk akun mereka.\n\nDetail:\n- Email terdaftar: \n- Alasan: ",
+        categorySlug: "akun-akses",
+        priority: "normal" as TicketPriority,
+        sortOrder: 0,
+    },
+    {
+        name: "Komplain Layanan",
+        subject: "Komplain Layanan",
+        content: "Pelanggan mengajukan komplain terkait layanan.\n\nKronologi:\n\nHarapan pelanggan:",
+        categorySlug: "lainnya",
+        priority: "high" as TicketPriority,
+        sortOrder: 1,
+    },
+    {
+        name: "Pertanyaan Umum",
+        subject: "Pertanyaan Informasi",
+        content: "Pelanggan bertanya mengenai:\n\n",
+        categorySlug: "informasi",
+        priority: "low" as TicketPriority,
+        sortOrder: 2,
+    },
+];
+
+// Default SLA Configurations
+const defaultSLAConfigs = [
+    { priority: "low" as TicketPriority, durationHrs: 48, description: "Tiket prioritas rendah" },
+    { priority: "normal" as TicketPriority, durationHrs: 24, description: "Tiket prioritas normal" },
+    { priority: "high" as TicketPriority, durationHrs: 8, description: "Tiket prioritas tinggi" },
+    { priority: "urgent" as TicketPriority, durationHrs: 4, description: "Tiket prioritas mendesak" },
+];
+
+// Email Templates - will be seeded from HTML files
+const emailTemplates = [
+    {
+        alias: "TICKET_CREATED",
+        name: "Ticket Created - Customer",
+        subject: "[{{TICKET_NUMBER}}] Ticket Anda Berhasil Dibuat",
+        description: "Email konfirmasi saat ticket berhasil dibuat",
+        fileName: "ticket-created.html",
+    },
+    {
+        alias: "TICKET_ASSIGNED",
+        name: "Ticket Assigned - Customer",
+        subject: "[{{TICKET_NUMBER}}] Ticket Anda Sedang Ditangani",
+        description: "Notifikasi ke customer saat ticket di-assign ke agent",
+        fileName: "ticket-assigned.html",
+    },
+    {
+        alias: "TICKET_STATUS_CHANGED",
+        name: "Status Changed - Customer",
+        subject: "[{{TICKET_NUMBER}}] Status Ticket Diperbarui",
+        description: "Notifikasi perubahan status ticket",
+        fileName: "ticket-status-changed.html",
+    },
+    {
+        alias: "TICKET_NEW_REPLY",
+        name: "New Reply - Customer",
+        subject: "[{{TICKET_NUMBER}}] Balasan Baru dari Tim Support",
+        description: "Notifikasi saat agent membalas ticket",
+        fileName: "ticket-new-reply.html",
+    },
+    {
+        alias: "TICKET_RESOLVED",
+        name: "Ticket Resolved - Customer",
+        subject: "[{{TICKET_NUMBER}}] Ticket Anda Telah Diselesaikan",
+        description: "Notifikasi saat ticket di-resolve",
+        fileName: "ticket-resolved.html",
+    },
+    {
+        alias: "TICKET_CLOSED",
+        name: "Ticket Closed - Customer",
+        subject: "[{{TICKET_NUMBER}}] Ticket Anda Telah Ditutup",
+        description: "Konfirmasi penutupan ticket",
+        fileName: "ticket-closed.html",
+    },
+    {
+        alias: "AGENT_TICKET_ASSIGNED",
+        name: "Ticket Assigned - Agent",
+        subject: "[{{TICKET_NUMBER}}] Ticket Baru Ditugaskan",
+        description: "Notifikasi ke agent saat ada ticket baru di-assign",
+        fileName: "agent-ticket-assigned.html",
+    },
+    {
+        alias: "AGENT_CUSTOMER_REPLY",
+        name: "Customer Reply - Agent",
+        subject: "[{{TICKET_NUMBER}}] Balasan Baru dari Customer",
+        description: "Notifikasi ke agent saat customer membalas",
+        fileName: "agent-customer-reply.html",
+    },
+    {
+        alias: "AGENT_SLA_WARNING",
+        name: "SLA Warning - Agent",
+        subject: "[{{TICKET_NUMBER}}] ⚠️ Peringatan SLA",
+        description: "Peringatan batas waktu SLA",
+        fileName: "agent-sla-warning.html",
+    },
+    {
+        alias: "AGENT_TICKET_PROGRESS",
+        name: "Ticket Progress - Agent",
+        subject: "[{{TICKET_NUMBER}}] Update Progress Ticket",
+        description: "Update progress ticket untuk agent pembuat",
+        fileName: "agent-ticket-progress.html",
+    },
+    {
+        alias: "USER_ACCOUNT_CREATED",
+        name: "Akun Baru Dibuat",
+        subject: "Selamat Datang di {{APP_NAME}} - Informasi Akun Anda",
+        description: "Email selamat datang untuk user baru dengan informasi login",
+        fileName: "user-account-created.html",
+    },
+    {
+        alias: "USER_PASSWORD_RESET",
+        name: "Password Direset",
+        subject: "Password Anda Telah Direset - {{APP_NAME}}",
+        description: "Email notifikasi saat admin mereset password user",
+        fileName: "user-password-reset.html",
+    },
 ];
 
 // Sample tickets
@@ -283,6 +409,93 @@ async function main() {
         categoryMap[category.slug] = cat.id;
     }
 
+    // Seed Templates
+    console.log("\n📋 Seeding templates...");
+    for (const template of defaultTemplates) {
+        const categoryId = categoryMap[template.categorySlug];
+        if (!categoryId) {
+            console.log(`   ⚠️  Category ${template.categorySlug} not found for template ${template.name}`);
+            continue;
+        }
+
+        const { categorySlug, ...templateData } = template;
+
+        // Check by name
+        const exists = await prisma.ticketTemplate.findFirst({
+            where: { name: template.name }
+        });
+
+        if (exists) {
+            console.log(`   ⏭️  Skipped: ${template.name} (exists)`);
+        } else {
+            await prisma.ticketTemplate.create({
+                data: {
+                    ...templateData,
+                    categoryId,
+                }
+            });
+            console.log(`   ✅ Created: ${template.name}`);
+        }
+    }
+
+    // Seed SLA Configs
+    console.log("\n⏱️  Seeding SLA configs...");
+    for (const slaConfig of defaultSLAConfigs) {
+        const exists = await prisma.sLAConfig.findUnique({
+            where: { priority: slaConfig.priority },
+        });
+
+        if (exists) {
+            console.log(`   ⏭️  Skipped: ${slaConfig.priority} (exists)`);
+        } else {
+            await prisma.sLAConfig.create({ data: slaConfig });
+            console.log(`   ✅ Created: SLA ${slaConfig.priority} - ${slaConfig.durationHrs}h`);
+        }
+    }
+
+    // Seed Email Templates
+    console.log("\n📧 Seeding email templates...");
+    const templatesDir = path.join(__dirname, "../docs/email-templates");
+
+    for (const template of emailTemplates) {
+        const exists = await prisma.emailTemplate.findUnique({
+            where: { alias: template.alias },
+        });
+
+        if (exists) {
+            console.log(`   ⏭️  Skipped: ${template.alias} (exists)`);
+            continue;
+        }
+
+        // Load HTML content from file
+        const filePath = path.join(templatesDir, template.fileName);
+        let content = "";
+
+        try {
+            if (fs.existsSync(filePath)) {
+                content = fs.readFileSync(filePath, "utf-8");
+                console.log(`   ✅ Created: ${template.alias} (loaded from ${template.fileName})`);
+            } else {
+                console.log(`   ⚠️  File not found: ${template.fileName}, using empty content`);
+                content = `<p>Template ${template.alias} - Content not available</p>`;
+            }
+        } catch (error) {
+            console.log(`   ⚠️  Error reading ${template.fileName}:`, error);
+            content = `<p>Template ${template.alias} - Content not available</p>`;
+        }
+
+        await prisma.emailTemplate.create({
+            data: {
+                alias: template.alias,
+                name: template.name,
+                subject: template.subject,
+                description: template.description,
+                content,
+                isActive: true,
+            },
+        });
+    }
+
     // Get admin user for createdBy
     console.log("\n👤 Looking for admin user...");
     const admin = await prisma.profile.findFirst({
@@ -345,13 +558,24 @@ async function main() {
             },
         });
 
-        // Add sample reply for in_progress tickets
+        // Add sample reply for in_progress and resolved tickets
         if (ticketData.status === "in_progress" || ticketData.status === "resolved") {
             await prisma.ticketReply.create({
                 data: {
                     ticketId: ticket.id,
                     authorId: admin.id,
                     message: "Terima kasih atas laporannya. Kami sedang memproses permintaan Anda dan akan segera memberikan update.",
+                },
+            });
+        }
+
+        // Add sample reply for pending tickets (Waiting for Info)
+        if (ticketData.status === "pending") {
+            await prisma.ticketReply.create({
+                data: {
+                    ticketId: ticket.id,
+                    authorId: admin.id,
+                    message: "Mohon maaf atas ketidaknyamanannya. Bisa tolong lampirkan screenshot pesan error yang muncul? Ini akan membantu kami mengidentifikasi masalahnya.",
                 },
             });
         }

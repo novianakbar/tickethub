@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="id" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
+    <title>Selamat Datang - {{APP_NAME}}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        :root {
+            color-scheme: light dark;
+            supported-color-schemes: light dark;
+        }
+        @media (prefers-color-scheme: dark) {
+            .body-bg { background-color: #1a1a1a !important; }
+            .content-bg { background-color: #2d2d2d !important; }
+            .header-bg { background-color: #b91c1c !important; }
+            .text-primary { color: #f3f4f6 !important; }
+            .text-secondary { color: #d1d5db !important; }
+            .text-muted { color: #9ca3af !important; }
+            .success-icon { background-color: #14532d !important; }
+            .success-text { color: #86efac !important; }
+            .info-card { background-color: #1e3a5f !important; border-color: #3b82f6 !important; }
+            .info-border { border-color: #1e40af !important; }
+            .footer-bg { background-color: #262626 !important; border-color: #404040 !important; }
+            .link-color { color: #fca5a5 !important; }
+            .warning-bg { background-color: #422006 !important; border-color: #f59e0b !important; }
+            .warning-text { color: #fcd34d !important; }
+        }
+    </style>
+</head>
+
+<body class="body-bg" style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f3f4f6; line-height: 1.6; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+    <!-- Preview Text -->
+    <div style="display: none; max-height: 0; overflow: hidden;">
+        Selamat datang di {{APP_NAME}}! Akun Anda telah berhasil dibuat.
+    </div>
+    
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="body-bg" style="background-color: #f3f4f6;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="content-bg" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px;">
+                    <!-- Header -->
+                    <tr>
+                        <td class="header-bg" style="background-color: #dc2626; padding: 32px 40px; text-align: center; border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">{{APP_NAME}}</h1>
+                            <p style="margin: 8px 0 0 0; color: #ffffff; font-size: 14px; font-weight: 500;">Sistem Manajemen Tiket</p>
+                        </td>
+                    </tr>
+
+                    <!-- Success Icon Section -->
+                    <tr>
+                        <td style="padding: 40px 40px 24px 40px; text-align: center;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
+                                <tr>
+                                    <td class="success-icon" style="width: 64px; height: 64px; background-color: #dcfce7; border-radius: 32px; text-align: center; vertical-align: middle;">
+                                        <span style="font-size: 28px; font-weight: 700; color: #16a34a; line-height: 64px;">&#10003;</span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <h2 class="success-text" style="margin: 20px 0 0 0; color: #16a34a; font-size: 22px; font-weight: 600;">Selamat Datang!</h2>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 0 40px 32px 40px;">
+                            <p class="text-secondary" style="margin: 0 0 20px 0; color: #4b5563; font-size: 15px;">
+                                Kepada <strong class="text-primary" style="color: #1f2937;">{{USER_NAME}}</strong>,
+                            </p>
+                            <p class="text-secondary" style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px;">
+                                Akun Anda telah berhasil dibuat di sistem {{APP_NAME}}. Berikut adalah informasi login Anda:
+                            </p>
+
+                            <!-- Account Info Card -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="info-card" style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; margin-bottom: 24px;">
+                                <tr>
+                                    <td style="padding: 24px;">
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                                            <tr>
+                                                <td class="info-border" style="padding: 0 0 16px 0; border-bottom: 1px solid #bfdbfe;">
+                                                    <p class="text-muted" style="margin: 0 0 4px 0; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Email</p>
+                                                    <p class="text-primary" style="margin: 0; color: #1f2937; font-size: 15px; font-weight: 600;">{{USER_EMAIL}}</p>
+                                                </td>
+                                            </tr>
+                                            {{#if USER_USERNAME}}
+                                            <tr>
+                                                <td class="info-border" style="padding: 16px 0; border-bottom: 1px solid #bfdbfe;">
+                                                    <p class="text-muted" style="margin: 0 0 4px 0; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Username</p>
+                                                    <p class="text-primary" style="margin: 0; color: #1f2937; font-size: 15px; font-weight: 600;">{{USER_USERNAME}}</p>
+                                                </td>
+                                            </tr>
+                                            {{/if}}
+                                            <tr>
+                                                <td class="info-border" style="padding: 16px 0; border-bottom: 1px solid #bfdbfe;">
+                                                    <p class="text-muted" style="margin: 0 0 4px 0; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Password Sementara</p>
+                                                    <p class="text-primary" style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 700; font-family: monospace; letter-spacing: 1px;">{{USER_PASSWORD}}</p>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="info-border" style="padding: 16px 0; border-bottom: 1px solid #bfdbfe;">
+                                                    <p class="text-muted" style="margin: 0 0 4px 0; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Role</p>
+                                                    <p class="text-primary" style="margin: 0; color: #1f2937; font-size: 14px;">{{USER_ROLE}}</p>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 16px 0 0 0;">
+                                                    <p class="text-muted" style="margin: 0 0 4px 0; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Level</p>
+                                                    <p class="text-primary" style="margin: 0; color: #1f2937; font-size: 14px;">{{USER_LEVEL}}</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Warning Box -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="warning-bg" style="background-color: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; margin-bottom: 24px;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <p class="warning-text" style="margin: 0; color: #92400e; font-size: 13px;">
+                                            <strong>⚠️ Penting:</strong> Demi keamanan, segera ubah password Anda setelah login pertama kali.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- CTA Button -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding: 8px 0;">
+                                        <!--[if mso]>
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{LOGIN_URL}}" style="height:48px;v-text-anchor:middle;width:160px;" arcsize="10%" strokecolor="#b91c1c" fillcolor="#dc2626">
+                                            <w:anchorlock/>
+                                            <center style="color:#ffffff;font-family:sans-serif;font-size:15px;font-weight:600;">Login Sekarang</center>
+                                        </v:roundrect>
+                                        <![endif]-->
+                                        <!--[if !mso]><!-->
+                                        <a href="{{LOGIN_URL}}" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-size: 15px; font-weight: 600; border: 1px solid #b91c1c;">Login Sekarang</a>
+                                        <!--<![endif]-->
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p class="text-muted" style="margin: 24px 0 0 0; color: #6b7280; font-size: 13px; text-align: center;">
+                                Jangan bagikan informasi login ini kepada siapapun.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td class="footer-bg" style="background-color: #f9fafb; padding: 24px 40px; border-top: 1px solid #e5e7eb; border-radius: 0 0 8px 8px;">
+                            <p class="text-muted" style="margin: 0 0 8px 0; color: #6b7280; font-size: 13px; text-align: center;">
+                                Jika Anda memiliki pertanyaan, hubungi kami di <a href="mailto:{{SUPPORT_EMAIL}}" class="link-color" style="color: #dc2626; text-decoration: none;">{{SUPPORT_EMAIL}}</a>
+                            </p>
+                            <p class="text-muted" style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center;">
+                                &copy; {{CURRENT_YEAR}} {{COMPANY_NAME}}. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>

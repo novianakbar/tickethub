@@ -109,7 +109,9 @@ export interface TicketDetail {
     closedAt: string | null;
     category: TicketCategory;
     assignee: Author | null;
+    assigneeId: string | null;
     createdBy: Author;
+    createdById: string;
     replies: TicketReply[];
     notes: TicketNote[];
     activities: TicketActivity[];

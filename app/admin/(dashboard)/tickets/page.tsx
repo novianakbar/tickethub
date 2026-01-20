@@ -1,22 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { AdminHeader } from "@/components/layout/AdminHeader";
+import { useSession } from "next-auth/react";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
     Card,
     CardContent,
 } from "@/components/ui/card";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import {
     Table,
     TableBody,
@@ -28,12 +21,8 @@ import {
 import { toast } from "sonner";
 import {
     Plus,
-    Search,
     Loader2,
     Ticket,
-    Filter,
-    ChevronLeft,
-    ChevronRight,
     AlertCircle,
     Clock,
     CheckCircle,
@@ -43,7 +32,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { getLevelClassName } from "@/lib/ticket-config";
+import { getLevelClassName, statusConfig as globalStatusConfig } from "@/lib/ticket-config";
+import { useTicketFilters } from "@/hooks/useTicketFilters";
+import { TicketFilterToolbar } from "@/components/tickets/TicketFilterToolbar";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
 interface TicketData {
     id: string;
@@ -61,6 +53,7 @@ interface TicketData {
     createdAt: string;
     updatedAt: string;
     category: {
+        id: string;
         name: string;
         color: string;
     };
@@ -82,13 +75,13 @@ interface PaginationData {
     totalPages: number;
 }
 
-const statusConfig = {
-    open: { label: "Menunggu", icon: Clock, className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
-    in_progress: { label: "Diproses", icon: ArrowUpRight, className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
-    pending: { label: "Pending", icon: Pause, className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
-    resolved: { label: "Selesai", icon: CheckCircle, className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
-    closed: { label: "Ditutup", icon: XCircle, className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400" },
-};
+const statusIcons = {
+    open: Clock,
+    in_progress: ArrowUpRight,
+    pending: Pause,
+    resolved: CheckCircle,
+    closed: XCircle,
+} as const;
 
 const priorityConfig = {
     low: { label: "Rendah", className: "text-gray-500" },
@@ -110,17 +103,22 @@ function formatTimeAgo(dateString: string): string {
     return date.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 }
 
-export default function AdminTicketsPage() {
+function AdminTicketsContent() {
     const [tickets, setTickets] = useState<TicketData[]>([]);
     const [pagination, setPagination] = useState<PaginationData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Filters
-    const [search, setSearch] = useState("");
-    const [statusFilter, setStatusFilter] = useState("all");
-    const [priorityFilter, setPriorityFilter] = useState("all");
-    const [levelFilter, setLevelFilter] = useState("all");
-    const [page, setPage] = useState(1);
+    // Metadata for filters
+    const [levels, setLevels] = useState<{ id: string; code: string; name: string }[]>([]);
+    const [categories, setCategories] = useState<{ id: string; name: string; color: string }[]>([]);
+
+    // Use our new custom hook for filters
+    const { filters, setPage, setLimit } = useTicketFilters();
+
+    const { data: session } = useSession();
+    const userRole = session?.user?.role;
+    const userLevel = session?.user?.level;
+    const canCreate = userRole === "admin" || userLevel?.canCreateTicket;
 
     // Stats
     const [stats, setStats] = useState({
@@ -131,16 +129,55 @@ export default function AdminTicketsPage() {
         resolved: 0,
     });
 
+    // Load filter options (Levels, Categories) only once
+    useEffect(() => {
+        const fetchOptions = async () => {
+            try {
+                // Fetch Categories
+                const catRes = await fetch("/api/categories");
+                if (catRes.ok) {
+                    const catData = await catRes.json();
+                    setCategories(catData.categories || []);
+                }
+
+                // Fetch Support Levels
+                const levelRes = await fetch("/api/support-levels");
+                if (levelRes.ok) {
+                    const levelData = await levelRes.json();
+                    // Assuming API returns array or { levels: [] }
+                    // Based on typical implementation, it might differ. 
+                    // Let's assume array for now, or check response if needed.
+                    // If the API follows standard pattern it might need .data or similar.
+                    // For now, assume array as per other endpoints.
+                    if (Array.isArray(levelData)) {
+                        setLevels(levelData);
+                    } else if (levelData.levels) {
+                        setLevels(levelData.levels);
+                    } else {
+                        setLevels(levelData); // fallback
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load filter options", e);
+            }
+        };
+        fetchOptions();
+    }, []);
+
+
     const fetchTickets = useCallback(async () => {
         setIsLoading(true);
         try {
             const params = new URLSearchParams();
-            params.set("page", page.toString());
-            params.set("limit", "20");
-            if (search) params.set("search", search);
-            if (statusFilter !== "all") params.set("status", statusFilter);
-            if (priorityFilter !== "all") params.set("priority", priorityFilter);
-            if (levelFilter !== "all") params.set("level", levelFilter);
+            params.set("page", filters.page.toString());
+            params.set("limit", filters.limit.toString());
+
+            if (filters.search) params.set("search", filters.search);
+            if (filters.status !== "all") params.set("status", filters.status);
+            if (filters.priority !== "all") params.set("priority", filters.priority);
+            if (filters.level !== "all") params.set("levelId", filters.level); // Note: API expects levelId
+            if (filters.categoryId !== "all") params.set("categoryId", filters.categoryId);
+            if (filters.assigneeId !== "all") params.set("assigneeId", filters.assigneeId);
 
             const res = await fetch(`/api/tickets?${params.toString()}`);
             if (res.ok) {
@@ -156,7 +193,7 @@ export default function AdminTicketsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [page, search, statusFilter, priorityFilter, levelFilter]);
+    }, [filters]);
 
     // Fetch stats separately (without filters)
     const fetchStats = useCallback(async () => {
@@ -186,263 +223,220 @@ export default function AdminTicketsPage() {
         fetchStats();
     }, [fetchStats]);
 
-    // Debounced search
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setPage(1);
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [search]);
-
     return (
-        <>
-            <AdminHeader
-                title="Semua Tiket"
-                description="Kelola dan tangani tiket support"
+        <div className="flex-1 p-6">
+            <PageHeader
+                title="Manajemen Tiket"
+                description="Kelola semua tiket support"
             />
-
-            <div className="flex-1 overflow-auto p-6">
-                {/* Stats Cards */}
-                <div className="mb-6 grid gap-4 sm:grid-cols-5">
-                    <Card className="border-l-4 border-l-primary">
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Total</p>
-                            <p className="text-2xl font-bold">{stats.total}</p>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-l-4 border-l-blue-500">
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Menunggu</p>
-                            <p className="text-2xl font-bold text-blue-600">{stats.open}</p>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-l-4 border-l-yellow-500">
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Diproses</p>
-                            <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-l-4 border-l-orange-500">
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Pending</p>
-                            <p className="text-2xl font-bold text-orange-600">{stats.pending}</p>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-l-4 border-l-green-500">
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Selesai</p>
-                            <p className="text-2xl font-bold text-green-600">{stats.resolved}</p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Filters */}
-                <Card className="mb-6">
+            {/* Stats Cards */}
+            <div className="mb-6 grid gap-4 grid-cols-2 md:grid-cols-5">
+                <Card className="border-l-4 border-l-primary">
                     <CardContent className="p-4">
-                        <div className="flex flex-wrap items-center gap-3">
-                            <div className="relative flex-1 min-w-[200px]">
-                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    placeholder="Cari tiket, pelanggan..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-9"
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Filter className="h-4 w-4 text-muted-foreground" />
-                                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                    <SelectTrigger className="w-[130px]">
-                                        <SelectValue placeholder="Status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Semua Status</SelectItem>
-                                        <SelectItem value="open">Menunggu</SelectItem>
-                                        <SelectItem value="in_progress">Diproses</SelectItem>
-                                        <SelectItem value="pending">Pending</SelectItem>
-                                        <SelectItem value="resolved">Selesai</SelectItem>
-                                        <SelectItem value="closed">Ditutup</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                                    <SelectTrigger className="w-[130px]">
-                                        <SelectValue placeholder="Prioritas" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Semua Prioritas</SelectItem>
-                                        <SelectItem value="urgent">Mendesak</SelectItem>
-                                        <SelectItem value="high">Tinggi</SelectItem>
-                                        <SelectItem value="normal">Normal</SelectItem>
-                                        <SelectItem value="low">Rendah</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Select value={levelFilter} onValueChange={setLevelFilter}>
-                                    <SelectTrigger className="w-[100px]">
-                                        <SelectValue placeholder="Level" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Semua</SelectItem>
-                                        <SelectItem value="L1">L1</SelectItem>
-                                        <SelectItem value="L2">L2</SelectItem>
-                                        <SelectItem value="L3">L3</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <Button asChild>
+                        <p className="text-sm text-muted-foreground">Total</p>
+                        <p className="text-2xl font-bold">{stats.total}</p>
+                    </CardContent>
+                </Card>
+                <Card className="border-l-4 border-l-blue-500">
+                    <CardContent className="p-4">
+                        <p className="text-sm text-muted-foreground">{globalStatusConfig.open.label}</p>
+                        <p className="text-2xl font-bold text-blue-600">{stats.open}</p>
+                    </CardContent>
+                </Card>
+                <Card className="border-l-4 border-l-yellow-500">
+                    <CardContent className="p-4">
+                        <p className="text-sm text-muted-foreground">{globalStatusConfig.in_progress.label}</p>
+                        <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
+                    </CardContent>
+                </Card>
+                <Card className="border-l-4 border-l-orange-500">
+                    <CardContent className="p-4">
+                        <p className="text-sm text-muted-foreground">{globalStatusConfig.pending.label}</p>
+                        <p className="text-2xl font-bold text-orange-600">{stats.pending}</p>
+                    </CardContent>
+                </Card>
+                <Card className="border-l-4 border-l-green-500">
+                    <CardContent className="p-4">
+                        <p className="text-sm text-muted-foreground">{globalStatusConfig.resolved.label}</p>
+                        <p className="text-2xl font-bold text-green-600">{stats.resolved}</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Advanced Filter Toolbar */}
+            <Card className="mb-6">
+                <CardContent className="p-4">
+                    <div className="mb-4 flex items-center justify-between">
+                        <h3 className="font-semibold">Filter & Pencarian</h3>
+                        {canCreate && (
+                            <Button asChild size="sm">
                                 <Link href="/admin/tickets/new">
-                                    <Plus className="h-4 w-4" />
+                                    <Plus className="h-4 w-4 mr-2" />
                                     Buat Tiket
                                 </Link>
                             </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                        )}
+                    </div>
+                    <TicketFilterToolbar levels={levels} categories={categories} />
+                </CardContent>
+            </Card>
 
-                {/* Tickets Table */}
-                <Card>
-                    {isLoading ? (
-                        <div className="flex items-center justify-center py-16">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            {/* Tickets Table */}
+            <Card>
+                {tickets.length === 0 && isLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                ) : tickets.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16">
+                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                            <Ticket className="h-8 w-8 text-muted-foreground" />
                         </div>
-                    ) : tickets.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                                <Ticket className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                            <h3 className="mb-1 font-semibold">Tidak ada tiket</h3>
-                            <p className="mb-4 text-sm text-muted-foreground">
-                                Belum ada tiket yang sesuai dengan filter
-                            </p>
+                        <h3 className="mb-1 font-semibold">Tidak ada tiket</h3>
+                        <p className="mb-4 text-sm text-muted-foreground">
+                            Belum ada tiket yang sesuai dengan filter
+                        </p>
+                        {canCreate && (
                             <Button asChild>
                                 <Link href="/admin/tickets/new">
                                     <Plus className="h-4 w-4" />
                                     Buat Tiket Baru
                                 </Link>
                             </Button>
-                        </div>
-                    ) : (
-                        <>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/50">
-                                        <TableHead className="w-28">No. Tiket</TableHead>
-                                        <TableHead>Subjek</TableHead>
-                                        <TableHead className="w-40">Pelanggan</TableHead>
-                                        <TableHead className="w-28 text-center">Kategori</TableHead>
-                                        <TableHead className="w-28 text-center">Status</TableHead>
-                                        <TableHead className="w-20 text-center">Level</TableHead>
-                                        <TableHead className="w-24 text-center">Prioritas</TableHead>
-                                        <TableHead className="w-28">Waktu</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {tickets.map((ticket) => {
-                                        const StatusIcon = statusConfig[ticket.status].icon;
-                                        return (
-                                            <TableRow
-                                                key={ticket.id}
-                                                className={cn(
-                                                    "group cursor-pointer hover:bg-muted/50 transition-colors",
-                                                    ticket.priority === "urgent" && "bg-red-50/50 dark:bg-red-900/10"
-                                                )}
-                                            >
-                                                <TableCell>
-                                                    <Link
-                                                        href={`/admin/tickets/${ticket.id}`}
-                                                        className="font-mono text-sm text-primary hover:underline"
-                                                    >
-                                                        {ticket.ticketNumber}
-                                                    </Link>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Link
-                                                        href={`/admin/tickets/${ticket.id}`}
-                                                        className="block group-hover:text-primary"
-                                                    >
-                                                        <p className="font-medium line-clamp-1">{ticket.subject}</p>
-                                                        {ticket._count.replies > 0 && (
-                                                            <p className="text-xs text-muted-foreground">
-                                                                {ticket._count.replies} balasan
-                                                            </p>
-                                                        )}
-                                                    </Link>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div>
-                                                        <p className="font-medium text-sm">{ticket.customerName}</p>
-                                                        <p className="text-xs text-muted-foreground truncate max-w-[150px]">
-                                                            {ticket.customerEmail}
+                        )}
+                    </div>
+                ) : (
+                    <div className={cn("transition-opacity duration-200", isLoading && "opacity-50 pointer-events-none")}>
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                    <TableHead className="w-28">No. Tiket</TableHead>
+                                    <TableHead>Subjek</TableHead>
+                                    <TableHead className="w-40">Pelanggan</TableHead>
+                                    <TableHead className="w-28 text-center">Kategori</TableHead>
+                                    <TableHead className="w-32 text-center">Agent</TableHead>
+                                    <TableHead className="w-28 text-center">Status</TableHead>
+                                    <TableHead className="w-20 text-center">Level</TableHead>
+                                    <TableHead className="w-24 text-center">Prioritas</TableHead>
+                                    <TableHead className="w-28">Waktu</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {tickets.map((ticket) => {
+                                    const StatusIcon = statusIcons[ticket.status as keyof typeof statusIcons];
+                                    const statusConf = globalStatusConfig[ticket.status as keyof typeof globalStatusConfig];
+                                    return (
+                                        <TableRow
+                                            key={ticket.id}
+                                            className={cn(
+                                                "group cursor-pointer hover:bg-muted/50 transition-colors",
+                                                ticket.priority === "urgent" && "bg-red-50/50 dark:bg-red-900/10"
+                                            )}
+                                        >
+                                            <TableCell>
+                                                <Link
+                                                    href={`/admin/tickets/${ticket.id}`}
+                                                    className="font-mono text-sm text-primary hover:underline"
+                                                >
+                                                    {ticket.ticketNumber}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Link
+                                                    href={`/admin/tickets/${ticket.id}`}
+                                                    className="block group-hover:text-primary"
+                                                >
+                                                    <p className="font-medium line-clamp-1">{ticket.subject}</p>
+                                                    {ticket._count.replies > 0 && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {ticket._count.replies} balasan
                                                         </p>
+                                                    )}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div>
+                                                    <p className="font-medium text-sm">{ticket.customerName}</p>
+                                                    <p className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                                        {ticket.customerEmail}
+                                                    </p>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-xs"
+                                                    style={{
+                                                        borderColor: ticket.category.color,
+                                                        color: ticket.category.color,
+                                                    }}
+                                                >
+                                                    {ticket.category.name}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                {ticket.assignee ? (
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="text-xs font-medium">{ticket.assignee.fullName}</span>
                                                     </div>
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-xs"
-                                                        style={{
-                                                            borderColor: ticket.category.color,
-                                                            color: ticket.category.color,
-                                                        }}
-                                                    >
-                                                        {ticket.category.name}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    <Badge className={cn("text-xs gap-1", statusConfig[ticket.status].className)}>
-                                                        <StatusIcon className="h-3 w-3" />
-                                                        {statusConfig[ticket.status].label}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    <Badge variant="outline" className={cn("text-xs", getLevelClassName(ticket.level?.code ?? "L1"))}>
-                                                        {ticket.level?.code ?? "L1"}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    <span className={cn("text-sm", priorityConfig[ticket.priority].className)}>
-                                                        {ticket.priority === "urgent" && <AlertCircle className="h-3 w-3 inline mr-1" />}
-                                                        {priorityConfig[ticket.priority].label}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell className="text-sm text-muted-foreground">
-                                                    {formatTimeAgo(ticket.createdAt)}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">-</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge className={cn("text-xs gap-1", statusConf.className)}>
+                                                    <StatusIcon className="h-3 w-3" />
+                                                    {statusConf.label}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge variant="outline" className={cn("text-xs", getLevelClassName(ticket.level?.code ?? "L1"))}>
+                                                    {ticket.level?.code ?? "L1"}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <span className={cn("text-sm", priorityConfig[ticket.priority].className)}>
+                                                    {ticket.priority === "urgent" && <AlertCircle className="h-3 w-3 inline mr-1" />}
+                                                    {priorityConfig[ticket.priority].label}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {formatTimeAgo(ticket.createdAt)}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
 
-                            {/* Pagination */}
-                            {pagination && pagination.totalPages > 1 && (
-                                <div className="flex items-center justify-between border-t px-4 py-3">
-                                    <p className="text-sm text-muted-foreground">
-                                        Halaman {pagination.page} dari {pagination.totalPages} ({pagination.total} tiket)
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                                            disabled={page === 1}
-                                        >
-                                            <ChevronLeft className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
-                                            disabled={page === pagination.totalPages}
-                                        >
-                                            <ChevronRight className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </Card>
+                        {/* Pagination */}
+                        {pagination && (
+                            <div className="border-t p-4">
+                                <DataTablePagination
+                                    pageIndex={pagination.page}
+                                    pageSize={pagination.limit}
+                                    rowCount={pagination.total}
+                                    pageCount={pagination.totalPages}
+                                    onPageChange={setPage}
+                                    onPageSizeChange={setLimit}
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+            </Card>
+        </div>
+    );
+}
+
+export default function AdminTicketsPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex h-[50vh] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-        </>
+        }>
+            <AdminTicketsContent />
+        </Suspense>
     );
 }

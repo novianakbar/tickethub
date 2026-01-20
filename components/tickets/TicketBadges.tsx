@@ -7,23 +7,64 @@ import {
     type TicketPriority,
 } from "@/lib/ticket-config";
 import type { SupportLevel } from "@/types/ticket";
+import {
+    Circle,
+    Play,
+    Pause,
+    CheckCircle,
+    XCircle,
+    AlertTriangle,
+    Minus,
+    ChevronUp,
+} from "lucide-react";
+
+// Status icons for accessibility (not just color-dependent)
+const statusIcons: Record<TicketStatus, React.ElementType> = {
+    open: Circle,
+    in_progress: Play,
+    pending: Pause,
+    resolved: CheckCircle,
+    closed: XCircle,
+};
+
+// Priority icons for accessibility
+const priorityIcons: Record<TicketPriority, React.ElementType> = {
+    low: Minus,
+    normal: Circle,
+    high: ChevronUp,
+    urgent: AlertTriangle,
+};
 
 interface StatusBadgeProps {
     status: TicketStatus;
+    showIcon?: boolean;
 }
 
-export function StatusBadge({ status }: StatusBadgeProps) {
+export function StatusBadge({ status, showIcon = true }: StatusBadgeProps) {
     const config = statusConfig[status];
-    return <Badge className={config.className}>{config.label}</Badge>;
+    const Icon = statusIcons[status];
+    return (
+        <Badge className={config.className}>
+            {showIcon && <Icon className="h-3 w-3 mr-1" />}
+            {config.label}
+        </Badge>
+    );
 }
 
 interface PriorityBadgeProps {
     priority: TicketPriority;
+    showIcon?: boolean;
 }
 
-export function PriorityBadge({ priority }: PriorityBadgeProps) {
+export function PriorityBadge({ priority, showIcon = true }: PriorityBadgeProps) {
     const config = priorityConfig[priority];
-    return <Badge className={config.className}>{config.label}</Badge>;
+    const Icon = priorityIcons[priority];
+    return (
+        <Badge className={config.className}>
+            {showIcon && <Icon className="h-3 w-3 mr-1" />}
+            {config.label}
+        </Badge>
+    );
 }
 
 interface LevelBadgeProps {

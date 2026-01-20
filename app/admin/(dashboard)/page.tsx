@@ -1,230 +1,238 @@
+"use client";
+
 import Link from "next/link";
-import { AdminHeader } from "@/components/layout/AdminHeader";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { useDashboard } from "@/hooks/useDashboard";
+import { toast } from "sonner";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+    Ticket,
+    Clock,
+    Zap,
+    CheckCircle,
+    AlertCircle,
+    UserX,
+    RefreshCw,
+    Plus
+} from "lucide-react";
 
-// Mock data
-const stats = [
-    {
-        title: "Total Tiket",
-        value: "248",
-        description: "Semua tiket",
-        icon: (
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-            </svg>
-        ),
-    },
-    {
-        title: "Menunggu",
-        value: "42",
-        description: "Belum diproses",
-        icon: (
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        ),
-    },
-    {
-        title: "Diproses",
-        value: "18",
-        description: "Sedang dikerjakan",
-        icon: (
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-        ),
-    },
-    {
-        title: "Selesai",
-        value: "188",
-        description: "Sudah ditutup",
-        icon: (
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        ),
-    },
-];
+import {
+    StatsCard,
+    UrgentTicketsList,
+    RecentActivityFeed,
+    RecentTicketsList,
+    DashboardSkeleton,
+    TicketTrendChart,
+    CategoryDistributionChart,
+    TeamPerformanceTable,
+    AdminQuickActions,
+    AgentQuickActions,
+} from "@/components/dashboard";
 
-const recentTickets = [
-    {
-        id: "TKT-M4X7K2P9",
-        subject: "Permintaan reset password",
-        status: "in_progress",
-        priority: "high",
-        customer: "Budi Santoso",
-        createdAt: "2024-12-23T10:30:00Z",
-    },
-    {
-        id: "TKT-N5Y8L3Q0",
-        subject: "Pembayaran tidak tercatat",
-        status: "open",
-        priority: "high",
-        customer: "Siti Aminah",
-        createdAt: "2024-12-23T09:15:00Z",
-    },
-    {
-        id: "TKT-O6Z9M4R1",
-        subject: "Kendala akses aplikasi",
-        status: "open",
-        priority: "medium",
-        customer: "Ahmad Wijaya",
-        createdAt: "2024-12-23T08:45:00Z",
-    },
-    {
-        id: "TKT-P7A0N5S2",
-        subject: "Perubahan data pelanggan",
-        status: "resolved",
-        priority: "low",
-        customer: "Dewi Lestari",
-        createdAt: "2024-12-22T16:20:00Z",
-    },
-];
+// Component to handle access denied toast - wrapped in Suspense
+function AccessDeniedHandler() {
+    const searchParams = useSearchParams();
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    open: {
-        label: "Menunggu",
-        className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-    },
-    in_progress: {
-        label: "Diproses",
-        className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-    },
-    resolved: {
-        label: "Selesai",
-        className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    },
-    closed: {
-        label: "Ditutup",
-        className: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400",
-    },
-};
+    useEffect(() => {
+        if (searchParams.get("access") === "denied") {
+            toast.error("Anda tidak memiliki akses ke halaman tersebut");
+            // Clean up URL without triggering navigation
+            window.history.replaceState({}, "", "/admin");
+        }
+    }, [searchParams]);
 
-const priorityConfig: Record<string, { label: string; className: string }> = {
-    low: {
-        label: "Normal",
-        className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    },
-    medium: {
-        label: "Sedang",
-        className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-    },
-    high: {
-        label: "Prioritas",
-        className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    },
-};
-
-function formatDate(dateString: string) {
-    return new Date(dateString).toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
+    return null;
 }
 
 export default function AdminDashboardPage() {
+    const { data, isLoading, error, refetch } = useDashboard();
+
+    // Loading state
+    if (isLoading) {
+        return (
+            <div className="flex-1 p-6">
+                <PageHeader
+                    title="Dashboard"
+                    description="Ringkasan tiket dan aktivitas"
+                />
+                <DashboardSkeleton isAdmin />
+            </div>
+        );
+    }
+
+    // Error state
+    if (error || !data) {
+        return (
+            <div className="flex-1 p-6">
+                <PageHeader
+                    title="Dashboard"
+                    description="Ringkasan tiket dan aktivitas"
+                />
+                <div className="flex items-center justify-center py-16">
+                    <div className="text-center">
+                        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                        <h2 className="text-lg font-semibold mb-2">
+                            Gagal memuat dashboard
+                        </h2>
+                        <p className="text-muted-foreground mb-4">
+                            {error || "Terjadi kesalahan saat memuat data"}
+                        </p>
+                        <Button onClick={() => refetch()} variant="outline">
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Coba Lagi
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const isAdmin = data.isAdmin;
+
     return (
-        <>
-            <AdminHeader
+        <div className="flex-1 p-6">
+            <Suspense fallback={null}>
+                <AccessDeniedHandler />
+            </Suspense>
+            <PageHeader
                 title="Dashboard"
                 description="Ringkasan tiket dan aktivitas"
             />
 
-            <div className="flex-1 overflow-auto p-6">
-                {/* Stats Grid */}
-                <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {stats.map((stat) => (
-                        <Card key={stat.title}>
-                            <CardContent className="p-5">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">{stat.title}</p>
-                                        <p className="text-2xl font-bold">{stat.value}</p>
-                                        <p className="text-xs text-muted-foreground">{stat.description}</p>
-                                    </div>
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                        {stat.icon}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+            <div className="space-y-6">
+                {/* ============================================ */}
+                {/* STATS CARDS - Personal Stats untuk semua */}
+                {/* ============================================ */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatsCard
+                        title="Tiket Open"
+                        value={data.myStats.open}
+                        description="Menunggu dikerjakan"
+                        icon={Ticket}
+                        iconClassName="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                        onClick={() => window.location.href = "/admin/tickets?status=open&assigneeId=me"}
+                    />
+                    <StatsCard
+                        title="Sedang Diproses"
+                        value={data.myStats.inProgress}
+                        description="Tiket aktif"
+                        icon={Zap}
+                        iconClassName="bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                        onClick={() => window.location.href = "/admin/tickets?status=in_progress&assigneeId=me"}
+                    />
+                    <StatsCard
+                        title="Menunggu Info"
+                        value={data.myStats.pending}
+                        description="Perlu respons customer"
+                        icon={Clock}
+                        iconClassName="bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+                        onClick={() => window.location.href = "/admin/tickets?status=pending&assigneeId=me"}
+                    />
+                    <StatsCard
+                        title="Selesai Hari Ini"
+                        value={data.myStats.resolvedToday}
+                        description="Resolved hari ini"
+                        icon={CheckCircle}
+                        iconClassName="bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                    />
                 </div>
 
-                {/* Quick Actions */}
-                <div className="mb-6 flex gap-3">
-                    <Button asChild>
-                        <Link href="/admin/tickets/new">
-                            <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                            </svg>
-                            Buat Tiket Baru
-                        </Link>
-                    </Button>
-                    <Button asChild variant="outline">
-                        <Link href="/admin/tickets">
-                            Lihat Semua Tiket
-                        </Link>
-                    </Button>
+                {/* ============================================ */}
+                {/* ADMIN: Global Stats */}
+                {/* ============================================ */}
+                {isAdmin && data.globalStats && (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <StatsCard
+                            title="Total Tiket"
+                            value={data.globalStats.total}
+                            description="Semua tiket"
+                            icon={Ticket}
+                            iconClassName="bg-slate-100 text-slate-600 dark:bg-slate-900/30 dark:text-slate-400"
+                            onClick={() => window.location.href = "/admin/tickets"}
+                        />
+                        <StatsCard
+                            title="Tiket Aktif"
+                            value={data.globalStats.open + data.globalStats.inProgress + data.globalStats.pending}
+                            description="Open + Proses + Pending"
+                            icon={Zap}
+                            iconClassName="bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+                        />
+                        <StatsCard
+                            title="Unassigned"
+                            value={data.globalStats.unassigned}
+                            description="Belum ditugaskan"
+                            icon={UserX}
+                            iconClassName="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                            onClick={() => window.location.href = "/admin/tickets?assigneeId=unassigned"}
+                        />
+                        <StatsCard
+                            title="Overdue"
+                            value={data.globalStats.overdue}
+                            description="Melewati tenggat"
+                            icon={AlertCircle}
+                            iconClassName="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                        />
+                    </div>
+                )}
+
+                {/* ============================================ */}
+                {/* QUICK ACTIONS */}
+                {/* ============================================ */}
+                {isAdmin ? (
+                    <AdminQuickActions
+                        unassignedCount={data.globalStats?.unassigned}
+                    />
+                ) : (
+                    <AgentQuickActions />
+                )}
+
+                {/* ============================================ */}
+                {/* ADMIN: Charts Section */}
+                {/* ============================================ */}
+                {isAdmin && data.chartData && (
+                    <div className="grid gap-6 lg:grid-cols-2">
+                        <TicketTrendChart data={data.chartData.ticketsByDay} />
+                        <CategoryDistributionChart data={data.chartData.ticketsByCategory} />
+                    </div>
+                )}
+
+                {/* ============================================ */}
+                {/* MAIN CONTENT GRID */}
+                {/* ============================================ */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                    {/* Urgent & Overdue Tickets */}
+                    <UrgentTicketsList
+                        urgentTickets={data.urgentTickets}
+                        overdueTickets={data.overdueTickets}
+                    />
+
+                    {/* Recent Activity Feed */}
+                    <RecentActivityFeed activities={data.recentActivities} />
                 </div>
 
-                {/* Recent Tickets */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Tiket Terbaru</CardTitle>
-                        <CardDescription>
-                            Tiket yang baru masuk dan memerlukan perhatian
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-3">
-                            {recentTickets.map((ticket) => (
-                                <Link
-                                    key={ticket.id}
-                                    href={`/admin/tickets/${ticket.id}`}
-                                    className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
-                                >
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-mono text-sm text-muted-foreground">
-                                                {ticket.id}
-                                            </span>
-                                            <Badge className={statusConfig[ticket.status].className}>
-                                                {statusConfig[ticket.status].label}
-                                            </Badge>
-                                            <Badge className={priorityConfig[ticket.priority].className}>
-                                                {priorityConfig[ticket.priority].label}
-                                            </Badge>
-                                        </div>
-                                        <p className="font-medium truncate">{ticket.subject}</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {ticket.customer} • {formatDate(ticket.createdAt)}
-                                        </p>
-                                    </div>
-                                    <svg
-                                        className="h-5 w-5 shrink-0 text-muted-foreground"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </Link>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+                {/* ============================================ */}
+                {/* ADMIN: Team Performance */}
+                {/* ============================================ */}
+                {isAdmin && data.teamPerformance && data.teamPerformance.length > 0 && (
+                    <TeamPerformanceTable data={data.teamPerformance} />
+                )}
+
+                {/* ============================================ */}
+                {/* RECENT TICKETS */}
+                {/* ============================================ */}
+                <RecentTicketsList
+                    tickets={data.recentTickets}
+                    title={isAdmin ? "Tiket Terbaru" : "Tiket Saya Terbaru"}
+                    description={isAdmin
+                        ? "Tiket terbaru yang memerlukan perhatian"
+                        : "Tiket yang ditugaskan kepada Anda"
+                    }
+                    viewAllHref={isAdmin ? "/admin/tickets" : "/admin/tickets?assigneeId=me"}
+                />
             </div>
-        </>
+        </div>
     );
 }

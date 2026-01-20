@@ -4,6 +4,16 @@ import { useRef, useState } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import {
     Mail,
@@ -36,6 +46,7 @@ interface TicketHeaderCardProps {
     onViewAttachment: (attachment: Attachment) => void;
     onDeleteAttachment: (attachmentId: string) => Promise<boolean>;
     onUploadAttachments: (files: PendingAttachment[]) => Promise<boolean>;
+    readOnly?: boolean;
 }
 
 function formatDateTime(dateString: string): string {
@@ -59,9 +70,19 @@ export function TicketHeaderCard({
     onViewAttachment,
     onDeleteAttachment,
     onUploadAttachments,
+    readOnly,
 }: TicketHeaderCardProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [deleteDialog, setDeleteDialog] = useState<{
+        open: boolean;
+        attachmentId: string;
+        fileName: string;
+    }>({
+        open: false,
+        attachmentId: "",
+        fileName: "",
+    });
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -110,9 +131,17 @@ export function TicketHeaderCard({
         }
     };
 
-    const handleDeleteClick = async (attachmentId: string) => {
-        if (!confirm("Hapus lampiran ini?")) return;
-        await onDeleteAttachment(attachmentId);
+    const handleDeleteClick = (attachmentId: string, fileName: string) => {
+        setDeleteDialog({
+            open: true,
+            attachmentId,
+            fileName,
+        });
+    };
+
+    const handleConfirmDelete = async () => {
+        await onDeleteAttachment(deleteDialog.attachmentId);
+        setDeleteDialog({ open: false, attachmentId: "", fileName: "" });
     };
 
     // Get level info from ticket.level object
@@ -206,30 +235,32 @@ export function TicketHeaderCard({
                             <Paperclip className="h-3 w-3" />
                             Lampiran ({ticket.attachments.length})
                         </p>
-                        <div>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                className="hidden"
-                                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
-                                multiple
-                                onChange={handleFileUpload}
-                            />
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isUploading}
-                                className="h-7 text-xs"
-                            >
-                                {isUploading ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                    <Plus className="h-3 w-3" />
-                                )}
-                                {isUploading ? "Uploading..." : "Tambah"}
-                            </Button>
-                        </div>
+                        {!readOnly && (
+                            <div>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    className="hidden"
+                                    accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                    multiple
+                                    onChange={handleFileUpload}
+                                />
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isUploading}
+                                    className="h-7 text-xs"
+                                >
+                                    {isUploading ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                        <Plus className="h-3 w-3" />
+                                    )}
+                                    {isUploading ? "Uploading..." : "Tambah"}
+                                </Button>
+                            </div>
+                        )}
                     </div>
                     {ticket.attachments.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
@@ -260,13 +291,15 @@ export function TicketHeaderCard({
                                             </div>
                                         )}
                                     </button>
-                                    <button
-                                        onClick={() => handleDeleteClick(att.id)}
-                                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600"
-                                        title="Hapus"
-                                    >
-                                        <Trash2 className="h-3 w-3" />
-                                    </button>
+                                    {!readOnly && (
+                                        <button
+                                            onClick={() => handleDeleteClick(att.id, att.fileName)}
+                                            className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600"
+                                            title="Hapus"
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </button>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -275,6 +308,31 @@ export function TicketHeaderCard({
                     )}
                 </div>
             </CardContent>
+
+            {/* Delete Attachment Confirmation Dialog */}
+            <AlertDialog 
+                open={deleteDialog.open} 
+                onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Hapus Lampiran?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Apakah Anda yakin ingin menghapus &quot;{deleteDialog.fileName}&quot;? 
+                            Tindakan ini tidak dapat dibatalkan.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Batal</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmDelete}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Ya, Hapus
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 }

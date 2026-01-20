@@ -3,6 +3,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createTicketActivity } from "@/lib/ticket-utils";
+import {
+    notifyTicketAssigned,
+    notifyAgentAssigned,
+    notifyAgentUnassigned,
+} from "@/lib/email-service";
 
 type RouteParams = {
     params: Promise<{ id: string }>;
@@ -21,14 +26,15 @@ export async function POST(request: Request, { params }: RouteParams) {
 
         const profile = await prisma.profile.findUnique({
             where: { id: session.user.id },
+            include: { level: true },
         });
 
         if (!profile) {
             return NextResponse.json({ error: "Profile not found" }, { status: 404 });
         }
 
-        // Only admin can assign tickets
-        if (profile.role !== "admin") {
+        // Only admin or users with canAssignTicket permission can assign tickets
+        if (profile.role !== "admin" && !profile.level.canAssignTicket) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
@@ -45,7 +51,7 @@ export async function POST(request: Request, { params }: RouteParams) {
             return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
         }
 
-        const { assigneeId } = await request.json();
+        const { assigneeId, note } = await request.json();
 
         // Get new assignee info
         let newAssignee = null;
@@ -81,17 +87,57 @@ export async function POST(request: Request, { params }: RouteParams) {
         // Log activity
         const oldAssigneeName = ticket.assignee?.fullName || ticket.assignee?.email || "Tidak ada";
         const newAssigneeName = newAssignee?.fullName || newAssignee?.email || "Tidak ada";
+        
+        // Build description with optional note
+        let activityDescription = assigneeId
+            ? `Tiket ditugaskan ke ${newAssigneeName}`
+            : "Tiket tidak lagi ditugaskan";
+        
+        if (note) {
+            activityDescription += ` — ${note}`;
+        }
 
         await createTicketActivity({
             ticketId: id,
             authorId: session.user.id,
             type: "assign",
-            description: assigneeId
-                ? "Tiket ditugaskan ke petugas"
-                : "Tiket tidak lagi ditugaskan",
+            description: activityDescription,
             oldValue: ticket.assigneeId || undefined,
             newValue: assigneeId || undefined,
         });
+
+        // Send email notifications (async, no await)
+        // Fetch ticket with full relations for email
+        const ticketForEmail = await prisma.ticket.findUnique({
+            where: { id },
+            include: {
+                category: true,
+                assignee: true,
+                createdBy: true,
+            },
+        });
+
+        if (ticketForEmail) {
+            // Notify customer that ticket is assigned
+            if (newAssignee) {
+                notifyTicketAssigned(ticketForEmail, profile);
+            }
+
+            // Notify new agent
+            if (newAssignee) {
+                notifyAgentAssigned(ticketForEmail, newAssignee, profile);
+            }
+
+            // Notify old agent if reassigning
+            if (ticket.assigneeId && newAssignee && ticket.assigneeId !== newAssignee.id) {
+                const oldAgent = await prisma.profile.findUnique({
+                    where: { id: ticket.assigneeId },
+                });
+                if (oldAgent) {
+                    notifyAgentUnassigned(ticketForEmail, oldAgent, newAssignee);
+                }
+            }
+        }
 
         return NextResponse.json({ ticket: updatedTicket });
     } catch (error) {

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { statusConfig, statusOptions } from "@/lib/ticket-config";
 
 interface TicketFiltersProps {
     searchQuery: string;
@@ -99,10 +100,11 @@ export function TicketFilters({
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">Semua Status</SelectItem>
-                                    <SelectItem value="open">Menunggu</SelectItem>
-                                    <SelectItem value="in_progress">Diproses</SelectItem>
-                                    <SelectItem value="resolved">Selesai</SelectItem>
-                                    <SelectItem value="closed">Ditutup</SelectItem>
+                                    {statusOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
 
@@ -141,7 +143,7 @@ export function TicketFilters({
                             )}
                             {statusFilter !== "all" && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
-                                    Status: {statusFilter === "in_progress" ? "Diproses" : statusFilter === "open" ? "Menunggu" : statusFilter === "resolved" ? "Selesai" : "Ditutup"}
+                                    Status: {statusConfig[statusFilter as import("@/lib/ticket-config").TicketStatus]?.label || statusFilter}
                                     <button
                                         onClick={() => onStatusChange("all")}
                                         className="ml-1 hover:text-destructive"

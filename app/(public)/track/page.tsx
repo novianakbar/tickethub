@@ -66,7 +66,7 @@ interface TicketResult {
 
 const statusConfig = {
     open: { label: "Menunggu Diproses", icon: Clock, className: "bg-blue-100 text-blue-700 border-blue-200", description: "Tiket Anda sedang dalam antrian dan akan segera ditangani." },
-    in_progress: { label: "Sedang Diproses", icon: ArrowUpRight, className: "bg-yellow-100 text-yellow-700 border-yellow-200", description: "Tim kami sedang menangani tiket Anda." },
+    in_progress: { label: "Sedang Diproses", icon: ArrowUpRight, className: "bg-purple-100 text-purple-700 border-purple-200", description: "Tim kami sedang menangani tiket Anda." },
     pending: { label: "Menunggu Respons", icon: Pause, className: "bg-orange-100 text-orange-700 border-orange-200", description: "Kami membutuhkan informasi tambahan dari Anda." },
     resolved: { label: "Selesai", icon: CheckCircle, className: "bg-green-100 text-green-700 border-green-200", description: "Tiket Anda telah diselesaikan. Silakan hubungi kami jika ada pertanyaan lain." },
     closed: { label: "Ditutup", icon: XCircle, className: "bg-gray-100 text-gray-700 border-gray-200", description: "Tiket ini telah ditutup." },

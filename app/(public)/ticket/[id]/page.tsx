@@ -52,7 +52,7 @@ const statusConfig: Record<PublicTicketStatus, {
     },
     in_progress: {
         label: "Sedang Diproses",
-        className: "bg-yellow-100 text-yellow-700 border-yellow-200",
+        className: "bg-purple-100 text-purple-700 border-purple-200",
         description: "Tim kami sedang menangani tiket Anda",
         icon: ArrowUpRight,
     },

@@ -1,96 +1,68 @@
 "use client";
 
-import { useState } from "react";
-import { AdminHeader } from "@/components/layout/AdminHeader";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import { toast } from "sonner";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GeneralSettings } from "@/components/settings/GeneralSettings";
+import { SMTPList } from "@/components/settings/SMTPList";
+import { SLASettings } from "@/components/settings/SLASettings";
+import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
+import { AccountSettings } from "@/components/settings/AccountSettings";
+import { useAuth } from "@/components/auth/auth-context";
 
 export default function AdminSettingsPage() {
-    const [isLoading, setIsLoading] = useState(false);
-
-    const [settings, setSettings] = useState({
-        siteName: "TicketHub",
-        supportEmail: "support@contoh.com",
-        autoClosedays: "7",
-    });
-
-    const handleSaveSettings = async () => {
-        setIsLoading(true);
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        toast.success("Pengaturan berhasil disimpan");
-        setIsLoading(false);
-    };
+    const { user } = useAuth();
+    const isAdmin = user?.role === "admin";
 
     return (
-        <>
-            <AdminHeader
+        <div className="flex-1 p-6">
+            <PageHeader
                 title="Pengaturan"
-                description="Kelola pengaturan sistem"
+                description="Kelola pengaturan sistem dan konfigurasi akun"
             />
 
-            <div className="flex-1 overflow-auto p-6">
-                <Card className="max-w-2xl">
-                    <CardHeader>
-                        <CardTitle className="text-base">Pengaturan Umum</CardTitle>
-                        <CardDescription>
-                            Konfigurasi dasar sistem
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="siteName">Nama Situs</Label>
-                            <Input
-                                id="siteName"
-                                value={settings.siteName}
-                                onChange={(e) =>
-                                    setSettings({ ...settings, siteName: e.target.value })
-                                }
-                            />
-                        </div>
+            <Tabs defaultValue="account" className="space-y-6">
+                <TabsList>
+                    {isAdmin && (
+                        <>
+                            <TabsTrigger value="general">Umum</TabsTrigger>
+                            <TabsTrigger value="smtp">SMTP</TabsTrigger>
+                            <TabsTrigger value="sla">SLA</TabsTrigger>
+                        </>
+                    )}
+                    <TabsTrigger value="account">Akun</TabsTrigger>
+                    <TabsTrigger value="notifications">Notifikasi</TabsTrigger>
+                </TabsList>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="supportEmail">Email Support</Label>
-                            <Input
-                                id="supportEmail"
-                                type="email"
-                                value={settings.supportEmail}
-                                onChange={(e) =>
-                                    setSettings({ ...settings, supportEmail: e.target.value })
-                                }
-                            />
-                        </div>
+                {isAdmin && (
+                    <>
+                        <TabsContent value="general">
+                            <div className="max-w-2xl">
+                                <GeneralSettings />
+                            </div>
+                        </TabsContent>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="autoClosedays">Auto-close Tiket (hari)</Label>
-                            <Input
-                                id="autoClosedays"
-                                type="number"
-                                min="1"
-                                value={settings.autoClosedays}
-                                onChange={(e) =>
-                                    setSettings({ ...settings, autoClosedays: e.target.value })
-                                }
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Tiket dengan status Selesai akan otomatis ditutup setelah jumlah hari ini
-                            </p>
-                        </div>
+                        <TabsContent value="smtp">
+                            <SMTPList />
+                        </TabsContent>
 
-                        <Button onClick={handleSaveSettings} disabled={isLoading}>
-                            {isLoading ? "Menyimpan..." : "Simpan Perubahan"}
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-        </>
+                        <TabsContent value="sla">
+                            <div className="max-w-2xl">
+                                <SLASettings />
+                            </div>
+                        </TabsContent>
+                    </>
+                )}
+
+                <TabsContent value="account">
+                    <AccountSettings />
+                </TabsContent>
+
+                <TabsContent value="notifications">
+                    <div className="max-w-2xl">
+                        <NotificationPreferences />
+                    </div>
+                </TabsContent>
+            </Tabs>
+        </div>
     );
 }

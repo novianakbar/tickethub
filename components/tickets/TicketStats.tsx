@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { Ticket } from "@/lib/ticket-config";
+import { statusConfig, type Ticket } from "@/lib/ticket-config";
 
 interface TicketStatsProps {
     tickets: Ticket[];
@@ -20,28 +20,35 @@ export function TicketStats({ tickets }: TicketStatsProps) {
     const stats: StatItem[] = [
         {
             key: "open",
-            label: "Menunggu",
+            label: statusConfig.open.label,
             count: tickets.filter((t) => t.status === "open").length,
             color: "text-blue-600 dark:text-blue-400",
             bgColor: "bg-blue-100 dark:bg-blue-900/30",
         },
         {
             key: "in_progress",
-            label: "Diproses",
+            label: statusConfig.in_progress.label,
             count: tickets.filter((t) => t.status === "in_progress").length,
-            color: "text-yellow-600 dark:text-yellow-400",
-            bgColor: "bg-yellow-100 dark:bg-yellow-900/30",
+            color: "text-purple-600 dark:text-purple-400",
+            bgColor: "bg-purple-100 dark:bg-purple-900/30",
+        },
+        {
+            key: "pending",
+            label: statusConfig.pending.label,
+            count: tickets.filter((t) => t.status === "pending").length,
+            color: "text-orange-600 dark:text-orange-400",
+            bgColor: "bg-orange-100 dark:bg-orange-900/30",
         },
         {
             key: "resolved",
-            label: "Selesai",
+            label: statusConfig.resolved.label,
             count: tickets.filter((t) => t.status === "resolved").length,
             color: "text-green-600 dark:text-green-400",
             bgColor: "bg-green-100 dark:bg-green-900/30",
         },
         {
             key: "closed",
-            label: "Ditutup",
+            label: statusConfig.closed.label,
             count: tickets.filter((t) => t.status === "closed").length,
             color: "text-gray-600 dark:text-gray-400",
             bgColor: "bg-gray-100 dark:bg-gray-800",

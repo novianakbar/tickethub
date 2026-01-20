@@ -6,8 +6,10 @@ export { TicketSidebar } from "./TicketSidebar";
 export { TicketStats } from "./TicketStats";
 export { TicketDetailSidebar } from "./TicketDetailSidebar";
 export { QuickActionsBar, StatusIndicator } from "./QuickActionsBar";
+export { SLAIndicator } from "./SLAIndicator";
 export { CustomerInfoCard } from "./CustomerInfoCard";
 export { AttachmentsSection } from "./AttachmentsSection";
+export { AssignTicketDialog } from "./AssignTicketDialog";
 
 // New components
 export { ReplyList } from "./ReplyList";
@@ -21,3 +23,4 @@ export { CreateTicketCustomerCard } from "./CreateTicketCustomerCard";
 export { CreateTicketDetailCard } from "./CreateTicketDetailCard";
 export { CreateTicketClassificationCard } from "./CreateTicketClassificationCard";
 export { CreateTicketSubmitBar } from "./CreateTicketSubmitBar";
+export { TemplateCombobox } from "./TemplateCombobox";

@@ -39,6 +39,12 @@ enum TicketSource {
   web
 }
 
+enum EmailLogStatus {
+  SENT
+  FAILED
+  SKIPPED
+}
+
 // ============================================
 // SUPPORT LEVEL (Master Table)
 // ============================================
@@ -92,6 +98,13 @@ model Profile {
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
 
+  // Email notification preferences
+  notifyOnAssigned      Boolean @default(true) @map("notify_on_assigned")
+  notifyOnCustomerReply Boolean @default(true) @map("notify_on_customer_reply")
+  notifySlaWarning      Boolean @default(true) @map("notify_sla_warning")
+  notifyTicketProgress  Boolean @default(true) @map("notify_ticket_progress")
+  notifyOnUnassigned    Boolean @default(true) @map("notify_on_unassigned")
+
   // Relations
   ticketsAssigned  Ticket[]         @relation("TicketAssignee")
   ticketsCreated   Ticket[]         @relation("TicketCreator")
@@ -121,7 +134,8 @@ model Category {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  tickets Ticket[]
+  tickets         Ticket[]
+  ticketTemplates TicketTemplate[]
 
   @@map("categories")
 }
@@ -140,6 +154,7 @@ model Ticket {
   levelId      String         @map("level_id") @db.Uuid
   level        SupportLevel   @relation(fields: [levelId], references: [id])
   source       TicketSource   @default(phone)
+  sourceNotes  String?        @map("source_notes") @db.VarChar(500)
 
   // Customer info (embedded in ticket)
   customerName    String  @map("customer_name")
@@ -261,4 +276,113 @@ model Attachment {
   @@index([replyId])
   @@index([noteId])
   @@map("attachments")
+}
+
+// ============================================
+// TICKET TEMPLATE (Quick Templates)
+// ============================================
+
+model TicketTemplate {
+  id         String         @id @default(uuid()) @db.Uuid
+  name       String
+  subject    String
+  content    String         @db.Text
+  categoryId String?        @map("category_id") @db.Uuid
+  category   Category?      @relation(fields: [categoryId], references: [id])
+  priority   TicketPriority @default(normal)
+  isActive   Boolean        @default(true) @map("is_active")
+  sortOrder  Int            @default(0) @map("sort_order")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+
+  @@map("ticket_templates")
+}
+
+// ============================================
+// SMTP CONFIGURATION
+// ============================================
+
+model SMTPConfig {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  host      String
+  port      Int
+  secure    Boolean  @default(true)
+  username  String
+  password  String
+  fromName  String   @map("from_name")
+  fromEmail String   @map("from_email")
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("smtp_configs")
+}
+
+// ============================================
+// EMAIL TEMPLATES
+// ============================================
+
+model EmailTemplate {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  alias       String   @unique // System identifier
+  subject     String
+  content     String   @db.Text
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("email_templates")
+}
+
+// ============================================
+// SLA CONFIGURATION
+// ============================================
+
+model SLAConfig {
+  id          String         @id @default(uuid()) @db.Uuid
+  priority    TicketPriority @unique
+  durationHrs Int            @map("duration_hrs") // SLA duration in hours
+  description String?
+  isActive    Boolean        @default(true) @map("is_active")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  @@map("sla_configs")
+}
+
+// ============================================
+// APP SETTINGS (Key-Value Store)
+// ============================================
+
+model AppSettings {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
+// ============================================
+// EMAIL LOG
+// ============================================
+
+model EmailLog {
+  id           String         @id @default(uuid()) @db.Uuid
+  templateCode String         @map("template_code")
+  recipient    String
+  subject      String
+  status       EmailLogStatus
+  errorMessage String?        @map("error_message")
+  ticketId     String?        @map("ticket_id") @db.Uuid
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  @@index([templateCode])
+  @@index([status])
+  @@index([ticketId])
+  @@map("email_logs")
 }

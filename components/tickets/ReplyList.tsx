@@ -36,7 +36,7 @@ export function ReplyList({ replies, onViewAttachment }: ReplyListProps) {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
             {replies.map((reply) => {
                 const isCustomer = reply.isCustomer || !reply.author;
                 const displayName = isCustomer

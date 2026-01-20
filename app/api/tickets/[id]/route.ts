@@ -4,6 +4,12 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createTicketActivity, statusLabels, priorityLabels } from "@/lib/ticket-utils";
 import { getFreshFileUrl } from "@/lib/s3";
+import {
+    notifyStatusChanged,
+    notifyTicketResolved,
+    notifyTicketClosed,
+    notifyAgentTicketProgress,
+} from "@/lib/email-service";
 import type { TicketStatus, TicketPriority } from "@prisma/client";
 
 type RouteParams = {
@@ -179,8 +185,9 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
         // Permission check
         if (profile.role !== "admin") {
-            if (ticket.assigneeId !== session.user.id && ticket.createdById !== session.user.id) {
-                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            // Allow if user is assignee OR creator OR ticket is unassigned
+            if (ticket.assigneeId && ticket.assigneeId !== session.user.id && ticket.createdById !== session.user.id) {
+                return NextResponse.json({ error: "Forbidden - Ticket is assigned to another agent" }, { status: 403 });
             }
         }
 
@@ -207,9 +214,34 @@ export async function PUT(request: Request, { params }: RouteParams) {
             newValue?: string;
         }> = [];
 
+        // Auto-assign if currently unassigned and user is acting on it (and not just viewing)
+        // We only auto-assign if the user is an agent (has level) and not just a regular user, 
+        // though strictly regular users shouldn't be hitting this API unless they are creator.
+        // For simplicity/safety: if ticket is unassigned, and this user is UPDATING it, assign to them.
+        if (!ticket.assigneeId && profile.role !== "admin") { // Admins allow manual assignment later, but agents "grab" it.
+            updates.assigneeId = session.user.id;
+            activities.push({
+                type: "assign",
+                description: `Tiket otomatis diambil oleh ${profile.fullName || session.user.email} (Action Based)`,
+                oldValue: undefined,
+                newValue: session.user.id,
+            });
+        }
+
         // Track changes
         if (status && status !== ticket.status) {
             updates.status = status as TicketStatus;
+
+            // Permission check for status changes
+            if (profile.role !== "admin") {
+                if (status === "resolved" && !profile.level.canResolveTicket) {
+                    return NextResponse.json({ error: "Tidak memiliki izin untuk menyelesaikan tiket" }, { status: 403 });
+                }
+                if (status === "closed" && !profile.level.canCloseTicket) {
+                    return NextResponse.json({ error: "Tidak memiliki izin untuk menutup tiket" }, { status: 403 });
+                }
+            }
+
             activities.push({
                 type: "status_change",
                 description: `Status diubah dari ${statusLabels[ticket.status]} ke ${statusLabels[status as TicketStatus]}`,
@@ -224,6 +256,9 @@ export async function PUT(request: Request, { params }: RouteParams) {
             if (status === "closed" && !ticket.closedAt) {
                 updates.closedAt = new Date();
             }
+
+            // Note: Removed the old "Auto-assign to current user if status changes to in_progress" block 
+            // because strict auto-assign at top covers it, or specific status logic here.
         }
 
         if (priority && priority !== ticket.priority) {
@@ -287,6 +322,34 @@ export async function PUT(request: Request, { params }: RouteParams) {
                 authorId: session.user.id,
                 ...activity,
             });
+        }
+
+        // Send email notifications for status changes (async, no await)
+        if (status && status !== ticket.status) {
+            // Fetch ticket with relations for email
+            const ticketForEmail = await prisma.ticket.findUnique({
+                where: { id },
+                include: {
+                    category: true,
+                    assignee: true,
+                    createdBy: true,
+                },
+            });
+
+            if (ticketForEmail) {
+                // Send specific email based on new status
+                if (status === "resolved") {
+                    notifyTicketResolved(ticketForEmail);
+                } else if (status === "closed") {
+                    notifyTicketClosed(ticketForEmail);
+                } else {
+                    // Generic status change notification
+                    notifyStatusChanged(ticketForEmail, ticket.status, status, profile);
+                }
+
+                // Notify ticket creator (agent) about progress
+                notifyAgentTicketProgress(ticketForEmail, ticket.status, status, profile);
+            }
         }
 
         return NextResponse.json({ ticket: updatedTicket });

@@ -25,11 +25,8 @@ import {
     RecentActivityFeed,
     RecentTicketsList,
     DashboardSkeleton,
-    TicketTrendChart,
-    CategoryDistributionChart,
-    TeamPerformanceTable,
-    AdminQuickActions,
-    AgentQuickActions,
+    AdminDashboardView,
+    AgentDashboardView,
 } from "@/components/dashboard";
 
 // Component to handle access denied toast - wrapped in Suspense
@@ -98,141 +95,18 @@ export default function AdminDashboardPage() {
                 <AccessDeniedHandler />
             </Suspense>
             <PageHeader
-                title="Dashboard"
-                description="Ringkasan tiket dan aktivitas"
+                title={isAdmin ? "Executive Dashboard" : "My Dashboard"}
+                description={isAdmin
+                    ? "Overview performa tim dan status operasional"
+                    : "Kelola tugas dan tiket harian Anda"
+                }
             />
 
-            <div className="space-y-6">
-                {/* ============================================ */}
-                {/* STATS CARDS - Personal Stats untuk semua */}
-                {/* ============================================ */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatsCard
-                        title="Tiket Open"
-                        value={data.myStats.open}
-                        description="Menunggu dikerjakan"
-                        icon={Ticket}
-                        iconClassName="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                        onClick={() => window.location.href = "/admin/tickets?status=open&assigneeId=me"}
-                    />
-                    <StatsCard
-                        title="Sedang Diproses"
-                        value={data.myStats.inProgress}
-                        description="Tiket aktif"
-                        icon={Zap}
-                        iconClassName="bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
-                        onClick={() => window.location.href = "/admin/tickets?status=in_progress&assigneeId=me"}
-                    />
-                    <StatsCard
-                        title="Menunggu Info"
-                        value={data.myStats.pending}
-                        description="Perlu respons customer"
-                        icon={Clock}
-                        iconClassName="bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
-                        onClick={() => window.location.href = "/admin/tickets?status=pending&assigneeId=me"}
-                    />
-                    <StatsCard
-                        title="Selesai Hari Ini"
-                        value={data.myStats.resolvedToday}
-                        description="Resolved hari ini"
-                        icon={CheckCircle}
-                        iconClassName="bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                    />
-                </div>
-
-                {/* ============================================ */}
-                {/* ADMIN: Global Stats */}
-                {/* ============================================ */}
-                {isAdmin && data.globalStats && (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <StatsCard
-                            title="Total Tiket"
-                            value={data.globalStats.total}
-                            description="Semua tiket"
-                            icon={Ticket}
-                            iconClassName="bg-slate-100 text-slate-600 dark:bg-slate-900/30 dark:text-slate-400"
-                            onClick={() => window.location.href = "/admin/tickets"}
-                        />
-                        <StatsCard
-                            title="Tiket Aktif"
-                            value={data.globalStats.open + data.globalStats.inProgress + data.globalStats.pending}
-                            description="Open + Proses + Pending"
-                            icon={Zap}
-                            iconClassName="bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
-                        />
-                        <StatsCard
-                            title="Unassigned"
-                            value={data.globalStats.unassigned}
-                            description="Belum ditugaskan"
-                            icon={UserX}
-                            iconClassName="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-                            onClick={() => window.location.href = "/admin/tickets?assigneeId=unassigned"}
-                        />
-                        <StatsCard
-                            title="Overdue"
-                            value={data.globalStats.overdue}
-                            description="Melewati tenggat"
-                            icon={AlertCircle}
-                            iconClassName="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-                        />
-                    </div>
-                )}
-
-                {/* ============================================ */}
-                {/* QUICK ACTIONS */}
-                {/* ============================================ */}
-                {isAdmin ? (
-                    <AdminQuickActions
-                        unassignedCount={data.globalStats?.unassigned}
-                    />
-                ) : (
-                    <AgentQuickActions />
-                )}
-
-                {/* ============================================ */}
-                {/* ADMIN: Charts Section */}
-                {/* ============================================ */}
-                {isAdmin && data.chartData && (
-                    <div className="grid gap-6 lg:grid-cols-2">
-                        <TicketTrendChart data={data.chartData.ticketsByDay} />
-                        <CategoryDistributionChart data={data.chartData.ticketsByCategory} />
-                    </div>
-                )}
-
-                {/* ============================================ */}
-                {/* MAIN CONTENT GRID */}
-                {/* ============================================ */}
-                <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Urgent & Overdue Tickets */}
-                    <UrgentTicketsList
-                        urgentTickets={data.urgentTickets}
-                        overdueTickets={data.overdueTickets}
-                    />
-
-                    {/* Recent Activity Feed */}
-                    <RecentActivityFeed activities={data.recentActivities} />
-                </div>
-
-                {/* ============================================ */}
-                {/* ADMIN: Team Performance */}
-                {/* ============================================ */}
-                {isAdmin && data.teamPerformance && data.teamPerformance.length > 0 && (
-                    <TeamPerformanceTable data={data.teamPerformance} />
-                )}
-
-                {/* ============================================ */}
-                {/* RECENT TICKETS */}
-                {/* ============================================ */}
-                <RecentTicketsList
-                    tickets={data.recentTickets}
-                    title={isAdmin ? "Tiket Terbaru" : "Tiket Saya Terbaru"}
-                    description={isAdmin
-                        ? "Tiket terbaru yang memerlukan perhatian"
-                        : "Tiket yang ditugaskan kepada Anda"
-                    }
-                    viewAllHref={isAdmin ? "/admin/tickets" : "/admin/tickets?assigneeId=me"}
-                />
-            </div>
+            {isAdmin ? (
+                <AdminDashboardView data={data} />
+            ) : (
+                <AgentDashboardView data={data} />
+            )}
         </div>
     );
 }

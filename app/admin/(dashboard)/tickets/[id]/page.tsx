@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -52,13 +53,22 @@ export default function AdminTicketDetailPage({
         isSubmitting,
         handleStatusChange,
         handlePriorityChange,
-        handleEscalate,
+        handleEscalate: originalHandleEscalate,
         handleAssigneeChange,
         handleSendReply,
         handleAddNote,
         handleUploadAttachments,
         handleDeleteAttachment,
     } = useTicketDetail({ ticketId: id });
+
+    const router = useRouter();
+
+    const handleEscalate = async () => {
+        const success = await originalHandleEscalate();
+        if (success) {
+            router.push("/admin/tickets");
+        }
+    };
 
     // Fetch agents list for assignment
     const [agents, setAgents] = useState<Array<{

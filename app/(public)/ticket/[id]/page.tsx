@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { getVerifiedTicket } from "@/lib/public-ticket-session";
+import { getVerifiedTicket, saveVerifiedTicket } from "@/lib/public-ticket-session";
 import type { PublicTicket, PublicTicketStatus } from "@/types/public-ticket";
 import { toast } from "sonner";
 import {
@@ -106,18 +106,52 @@ export default function TicketDetailPage({
     const [sessionEmail, setSessionEmail] = useState("");
 
     useEffect(() => {
-        // Check session for verified ticket
-        const session = getVerifiedTicket(id);
+        const fetchLatestTicket = async () => {
+            // Check session for verified ticket
+            const session = getVerifiedTicket(id);
 
-        if (!session) {
-            // Not verified, redirect to home
-            router.replace("/");
-            return;
-        }
+            if (!session) {
+                // Not verified, redirect to home
+                router.replace("/");
+                return;
+            }
 
-        setTicket(session.ticket);
-        setSessionEmail(session.email);
-        setIsLoading(false);
+            // Set initial data from session (optimistic)
+            setTicket(session.ticket);
+            setSessionEmail(session.email);
+
+            try {
+                // Fetch fresh data
+                const res = await fetch("/api/public/tickets/lookup", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ticketNumber: session.ticketNumber,
+                        email: session.email,
+                    }),
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.ticket) {
+                        setTicket(data.ticket);
+                        // Update session with fresh data
+                        saveVerifiedTicket(
+                            session.ticketNumber,
+                            session.email,
+                            data.ticket
+                        );
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to refresh ticket:", error);
+                // Silently fail and keep using session data
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchLatestTicket();
     }, [id, router]);
 
     if (isLoading) {

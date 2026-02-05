@@ -1,13 +1,15 @@
-// Dashboard Components Index
-// Export all dashboard components
-
-export { StatsCard } from "./StatsCard";
-export { UrgentTicketsList } from "./UrgentTicketsList";
-export { RecentActivityFeed } from "./RecentActivityFeed";
-export { RecentTicketsList } from "./RecentTicketsList";
-export { DashboardSkeleton } from "./DashboardSkeleton";
-export { TicketTrendChart } from "./TicketTrendChart";
-export { CategoryDistributionChart } from "./CategoryDistributionChart";
-export { TeamPerformanceTable } from "./TeamPerformanceTable";
-export { AdminQuickActions } from "./AdminQuickActions";
-export { AgentQuickActions } from "./AgentQuickActions";
+export * from './AdminQuickActions';
+export * from './AgentQuickActions';
+export * from './CategoryDistributionChart';
+export * from './DashboardSkeleton';
+export * from './RecentActivityFeed';
+export * from './RecentTicketsList';
+export * from './StatsCard';
+export * from './TeamPerformanceTable';
+export * from './TicketTrendChart';
+export * from './UrgentTicketsList';
+export * from './AdminDashboardView';
+export * from './AgentDashboardView';
+export * from './TicketSourceChart';
+export * from './PerformanceKPICard';
+export * from './StalledTicketsList';

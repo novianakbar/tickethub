@@ -49,6 +49,10 @@ export interface AgentStats {
     inProgress: number;     // Tiket in_progress yang saya kerjakan
     pending: number;        // Tiket pending menunggu respons
     resolvedToday: number;  // Tiket resolved hari ini
+    dueSoon: number;        // Tiket deadline < 24 jam (hari ini/besok)
+    stalled: number;        // Tiket in_progress no update > 3 days
+    avgResponseTime: number | null; // Rata-rata waktu respon pertama (jam)
+    avgResolutionTime: number | null; // Rata-rata waktu penyelesaian (jam)
 }
 
 export interface AgentDashboardData {
@@ -62,17 +66,6 @@ export interface AgentDashboardData {
 // ============================================
 // ADMIN DASHBOARD STATS
 // ============================================
-
-export interface GlobalStats {
-    total: number;
-    open: number;
-    inProgress: number;
-    pending: number;
-    resolved: number;
-    closed: number;
-    unassigned: number;
-    overdue: number;
-}
 
 export interface TicketsByDayData {
     date: string;       // Format: "2024-01-13"
@@ -93,10 +86,31 @@ export interface TicketsByPriorityData {
     count: number;
 }
 
+export interface TicketsBySourceData {
+    source: string;
+    count: number;
+    fill: string; // Color for the chart
+}
+
 export interface ChartData {
     ticketsByDay: TicketsByDayData[];           // 7 hari terakhir
     ticketsByCategory: TicketsByCategoryData[];
     ticketsByPriority: TicketsByPriorityData[];
+    ticketsBySource: TicketsBySourceData[];
+}
+
+export interface GlobalStats {
+    total: number;
+    open: number;
+    inProgress: number;
+    pending: number;
+    resolved: number;
+    closed: number;
+    unassigned: number;
+    overdue: number;
+    stalled: number; // Tickets in progress but not updated > 3 days
+    avgResponseTime: number | null; // In hours
+    avgResolutionTime: number | null; // In hours
 }
 
 export interface TeamPerformance {

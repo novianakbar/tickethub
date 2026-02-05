@@ -41,7 +41,7 @@ export function getGlobalVariables(): EmailVariables {
  */
 export function getTicketVariables(ticket: TicketWithRelations): EmailVariables {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  
+
   // Format status untuk display
   const statusMap: Record<string, string> = {
     open: "Open",
@@ -83,7 +83,7 @@ export function getTicketVariables(ticket: TicketWithRelations): EmailVariables 
     TICKET_STATUS: statusMap[ticket.status] || ticket.status,
     TICKET_PRIORITY: priorityMap[ticket.priority] || ticket.priority,
     TICKET_CATEGORY: ticket.category?.name || "-",
-    TICKET_URL: `${baseUrl}/track?ticket=${ticket.ticketNumber}`,
+    TICKET_URL: baseUrl,
     TICKET_ADMIN_URL: `${baseUrl}/admin/tickets/${ticket.id}`,
     CREATED_AT: formatDateTime(ticket.createdAt),
     PRIORITY_COLOR: priorityColorMap[ticket.priority] || "#6b7280",
@@ -130,7 +130,7 @@ export function getAgentVariables(agent: ProfileForEmail | null, prefix = "AGENT
  */
 export function getReplyVariables(reply: ReplyWithAuthor): EmailVariables {
   const authorName = reply.author?.fullName || reply.author?.email || "Customer";
-  
+
   return {
     REPLY_CONTENT: reply.message,
     REPLY_DATE: formatDateTime(reply.createdAt),
@@ -214,10 +214,10 @@ export function getResolutionVariables(
   const resolvedAt = ticket.resolvedAt || new Date();
   const createdAt = ticket.createdAt;
   const diffMs = resolvedAt.getTime() - createdAt.getTime();
-  
+
   const hours = Math.floor(diffMs / (1000 * 60 * 60));
   const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  
+
   let resolutionTime = "";
   if (hours > 24) {
     const days = Math.floor(hours / 24);
@@ -297,7 +297,7 @@ export function getUserAccountVariables(
   password: string
 ): EmailVariables {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  
+
   const roleMap: Record<string, string> = {
     admin: "Administrator",
     agent: "Agent",

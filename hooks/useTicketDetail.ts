@@ -15,7 +15,7 @@ interface UseTicketDetailReturn {
     refetch: () => Promise<void>;
     handleStatusChange: (newStatus: string) => Promise<void>;
     handlePriorityChange: (newPriority: string) => Promise<void>;
-    handleEscalate: () => Promise<void>;
+    handleEscalate: () => Promise<boolean>;
     handleAssigneeChange: (assigneeId: string | null, note?: string) => Promise<boolean>;
     handleSendReply: (message: string, attachments?: PendingAttachment[]) => Promise<boolean>;
     handleAddNote: (content: string, attachments?: PendingAttachment[]) => Promise<boolean>;
@@ -51,7 +51,7 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
 
     const handleStatusChange = useCallback(async (newStatus: string) => {
         if (!ticket) return;
-        
+
         const statusLabels: Record<string, string> = {
             open: "Baru",
             in_progress: "Diproses",
@@ -60,9 +60,9 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
             closed: "Ditutup",
         };
         const newLabel = statusLabels[newStatus] || newStatus;
-        
+
         const toastId = toast.loading(`Mengubah status ke ${newLabel}...`);
-        
+
         try {
             const res = await fetch(`/api/tickets/${ticketId}`, {
                 method: "PUT",
@@ -84,7 +84,7 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
 
     const handlePriorityChange = useCallback(async (newPriority: string) => {
         if (!ticket) return;
-        
+
         const priorityLabels: Record<string, string> = {
             low: "Rendah",
             normal: "Normal",
@@ -92,9 +92,9 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
             urgent: "Mendesak",
         };
         const newLabel = priorityLabels[newPriority] || newPriority;
-        
+
         const toastId = toast.loading(`Mengubah prioritas ke ${newLabel}...`);
-        
+
         try {
             const res = await fetch(`/api/tickets/${ticketId}`, {
                 method: "PUT",
@@ -114,14 +114,14 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
         }
     }, [ticket, ticketId, refetch]);
 
-    const handleEscalate = useCallback(async () => {
-        if (!ticket) return;
-        
+    const handleEscalate = useCallback(async (): Promise<boolean> => {
+        if (!ticket) return false;
+
         const currentLevel = ticket.level?.code || "L1";
         const nextLevel = currentLevel === "L1" ? "L2" : "L3";
-        
+
         const toastId = toast.loading(`Mengeskasikan tiket ke ${nextLevel}...`);
-        
+
         try {
             const res = await fetch(`/api/tickets/${ticketId}/escalate`, {
                 method: "POST",
@@ -130,27 +130,31 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
             });
             if (res.ok) {
                 toast.success(`Tiket berhasil dieskalasi ke ${nextLevel}`, { id: toastId });
-                refetch();
+                // We don't refetch here because we expect the page to redirect
+                // refetch(); 
+                return true;
             } else {
                 const error = await res.json();
                 toast.error(error.error || "Gagal eskalasi", { id: toastId });
+                return false;
             }
         } catch (error) {
             console.error("Escalate error:", error);
             toast.error("Terjadi kesalahan saat eskalasi", { id: toastId });
+            return false;
         }
-    }, [ticket, ticketId, refetch]);
+    }, [ticket, ticketId]);
 
     const handleAssigneeChange = useCallback(async (assigneeId: string | null, note?: string): Promise<boolean> => {
         const toastId = toast.loading("Menugaskan tiket...");
-        
+
         try {
             const res = await fetch(`/api/tickets/${ticketId}/assign`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ assigneeId, note }),
             });
-            
+
             if (res.ok) {
                 toast.success(assigneeId ? "Tiket berhasil ditugaskan" : "Penugasan tiket dihapus", { id: toastId });
                 refetch();
@@ -170,9 +174,9 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
     const handleSendReply = useCallback(async (message: string, attachments?: PendingAttachment[]): Promise<boolean> => {
         if (!message.trim()) return false;
         setIsSubmitting(true);
-        
+
         const toastId = toast.loading("Mengirim balasan...");
-        
+
         try {
             const res = await fetch(`/api/tickets/${ticketId}/reply`, {
                 method: "POST",
@@ -203,9 +207,9 @@ export function useTicketDetail({ ticketId }: UseTicketDetailOptions): UseTicket
     const handleAddNote = useCallback(async (content: string, attachments?: PendingAttachment[]): Promise<boolean> => {
         if (!content.trim()) return false;
         setIsSubmitting(true);
-        
+
         const toastId = toast.loading("Menambahkan catatan...");
-        
+
         try {
             const res = await fetch(`/api/tickets/${ticketId}/note`, {
                 method: "POST",

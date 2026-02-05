@@ -12,8 +12,10 @@ import type {
     TeamPerformance,
     TicketsByDayData,
     TicketsByCategoryData,
-    TicketsByPriorityData
+    TicketsByPriorityData,
+    TicketsBySourceData
 } from "@/types/dashboard";
+import { getTicketsBySource } from "./helpers";
 
 // GET /api/dashboard/stats - Get dashboard statistics
 export async function GET() {
@@ -102,7 +104,7 @@ export async function GET() {
 // ============================================
 
 async function getMyStats(userId: string, today: Date, tomorrow: Date): Promise<AgentStats> {
-    const [open, inProgress, pending, resolvedToday] = await Promise.all([
+    const [open, inProgress, pending, resolvedToday, dueSoon, stalled] = await Promise.all([
         prisma.ticket.count({
             where: { assigneeId: userId, status: "open" },
         }),
@@ -119,9 +121,78 @@ async function getMyStats(userId: string, today: Date, tomorrow: Date): Promise<
                 resolvedAt: { gte: today, lt: tomorrow },
             },
         }),
+        // Due Soon: Assignee is me, status not resolved/closed, due date < 24 hours from now
+        prisma.ticket.count({
+            where: {
+                assigneeId: userId,
+                status: { in: ["open", "in_progress", "pending"] },
+                dueDate: {
+                    gte: new Date(),
+                    lt: new Date(new Date().getTime() + 24 * 60 * 60 * 1000)
+                }
+            }
+        }),
+        // Stalled: Assignee is me, In Progress, no update > 3 days
+        prisma.ticket.count({
+            where: {
+                assigneeId: userId,
+                status: "in_progress",
+                updatedAt: { lt: new Date(new Date().getTime() - 3 * 24 * 60 * 60 * 1000) }
+            }
+        })
     ]);
 
-    return { open, inProgress, pending, resolvedToday };
+    // Calculate Personal Average Resolution Time (Last 30 days)
+    const thirtyDaysAgo = new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000);
+    const myResolvedTickets = await prisma.ticket.findMany({
+        where: {
+            assigneeId: userId,
+            status: { in: ["resolved", "closed"] },
+            resolvedAt: { gte: thirtyDaysAgo }
+        },
+        select: { createdAt: true, resolvedAt: true }
+    });
+
+    let avgResolutionTime: number | null = null;
+    if (myResolvedTickets.length > 0) {
+        const totalHours = myResolvedTickets.reduce((acc, t) => {
+            if (t.resolvedAt) {
+                return acc + (t.resolvedAt.getTime() - t.createdAt.getTime()) / (1000 * 60 * 60);
+            }
+            return acc;
+        }, 0);
+        avgResolutionTime = Math.round((totalHours / myResolvedTickets.length) * 10) / 10;
+    }
+
+    // Calculate Personal Average Response Time (First Reply)
+    const myActivities = await prisma.ticketActivity.findMany({
+        where: {
+            authorId: userId,
+            type: "reply",
+            createdAt: { gte: thirtyDaysAgo }
+        },
+        select: { createdAt: true, ticket: { select: { createdAt: true } } },
+        take: 200
+    });
+
+    let avgResponseTime: number | null = null;
+    if (myActivities.length > 0) {
+        const totalResponseHours = myActivities.reduce((acc, act) => {
+            return acc + (act.createdAt.getTime() - act.ticket.createdAt.getTime()) / (1000 * 60 * 60);
+        }, 0);
+        avgResponseTime = Math.round((totalResponseHours / myActivities.length) * 10) / 10;
+    }
+
+    return {
+        open,
+        inProgress,
+        pending,
+        resolvedToday,
+        dueSoon,
+        stalled,
+        avgResponseTime,
+        avgResolutionTime
+    };
 }
 
 async function getUrgentTickets(
@@ -255,7 +326,7 @@ async function getRecentActivities(
 async function getGlobalStats(): Promise<GlobalStats> {
     const now = new Date();
 
-    const [total, open, inProgress, pending, resolved, closed, unassigned, overdue] = await Promise.all([
+    const [total, open, inProgress, pending, resolved, closed, unassigned, overdue, stalled] = await Promise.all([
         prisma.ticket.count(),
         prisma.ticket.count({ where: { status: "open" } }),
         prisma.ticket.count({ where: { status: "in_progress" } }),
@@ -269,19 +340,67 @@ async function getGlobalStats(): Promise<GlobalStats> {
                 status: { in: ["open", "in_progress", "pending"] }
             }
         }),
+        // Stalled: In Progress but not updated > 3 days
+        prisma.ticket.count({
+            where: {
+                status: "in_progress",
+                updatedAt: { lt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000) }
+            }
+        }),
     ]);
 
-    return { total, open, inProgress, pending, resolved, closed, unassigned, overdue };
+    // Calculate Global Average Resolution Time (for resolved tickets in last 30 days)
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const resolvedTickets = await prisma.ticket.findMany({
+        where: {
+            status: { in: ["resolved", "closed"] },
+            resolvedAt: { gte: thirtyDaysAgo }
+        },
+        select: { createdAt: true, resolvedAt: true }
+    });
+
+    let avgResolutionTime: number | null = null;
+    if (resolvedTickets.length > 0) {
+        const totalHours = resolvedTickets.reduce((acc, t) => {
+            if (t.resolvedAt) {
+                return acc + (t.resolvedAt.getTime() - t.createdAt.getTime()) / (1000 * 60 * 60);
+            }
+            return acc;
+        }, 0);
+        avgResolutionTime = Math.round((totalHours / resolvedTickets.length) * 10) / 10;
+    }
+
+    // Calculate Average Response Time (First Reply) - Estimated via TicketActivities for "reply" type
+    // This is an estimation query for performance
+    const replyActivities = await prisma.ticketActivity.findMany({
+        where: {
+            type: "reply",
+            createdAt: { gte: thirtyDaysAgo }
+        },
+        select: { createdAt: true, ticket: { select: { createdAt: true } } },
+        take: 500 // Limit sample size for performance
+    });
+
+    let avgResponseTime: number | null = null;
+    if (replyActivities.length > 0) {
+        const totalResponseHours = replyActivities.reduce((acc, act) => {
+            return acc + (act.createdAt.getTime() - act.ticket.createdAt.getTime()) / (1000 * 60 * 60);
+        }, 0);
+        avgResponseTime = Math.round((totalResponseHours / replyActivities.length) * 10) / 10;
+    }
+
+    return { total, open, inProgress, pending, resolved, closed, unassigned, overdue, stalled, avgResolutionTime, avgResponseTime };
 }
 
 async function getChartData(): Promise<ChartData> {
-    const [ticketsByDay, ticketsByCategory, ticketsByPriority] = await Promise.all([
+    const [ticketsByDay, ticketsByCategory, ticketsByPriority, ticketsBySource] = await Promise.all([
         getTicketsByDay(),
         getTicketsByCategory(),
         getTicketsByPriority(),
+        getTicketsBySource(),
     ]);
 
-    return { ticketsByDay, ticketsByCategory, ticketsByPriority };
+    return { ticketsByDay, ticketsByCategory, ticketsByPriority, ticketsBySource };
 }
 
 async function getTicketsByDay(): Promise<TicketsByDayData[]> {
